@@ -1,0 +1,33 @@
+---
+title: "PACE-data-reader.qmd"
+author: "Levi Carr"
+format: html
+---
+
+```{r}
+library(tidync)
+library(ncdf4)
+```
+```{r}
+cloudnc <- nc_open("PACE_OCI.20250402.L3m.DAY.CLOUD.V3_0.1deg.NRT.nc")
+cloudnc2 <- "PACE_OCI.20250402.L3m.DAY.CLOUD.V3_0.1deg.NRT.nc"
+```
+
+
+```{r}
+cloud_data <- tidync(cloudnc2) |> hyper_tibble(cloudnc$var$ctp_16)
+```
+
+```{r}
+filter(cloud_data, 'lat' < 44 & 'lat' > 43)
+filter(cloud_data, 'lon' < -90 & 'lon' > -80)
+```
+
+```{r}
+cloud_data <- rbind(cer_16, ctp_16, cwp_16)
+```
+
+
+
+
+

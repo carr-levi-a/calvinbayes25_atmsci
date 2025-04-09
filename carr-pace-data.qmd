@@ -1,0 +1,57 @@
+---
+title: "NASA PACE nc files"
+format: 
+  html:
+    embed-resources: true
+    code-tools: true
+editor: source
+---
+
+```{r}
+#| include: false
+library(ncdf4)
+library(tidyverse)
+```
+
+Read in PACE data from one .nc file
+
+Read in the 0.1deg or about 10km resolution data (11.1 km?)
+
+```{r}
+data <- nc_open("PACE_OCI.20250330.L3m.DAY.CLOUD.V3_0.1deg.NRT.nc")
+```
+
+Now extract variables we want:
+
+```{r}
+# positions
+lat <- ncvar_get(data, "lat") #columns of data matrices
+lon <- ncvar_get(data, "lon") # rows of data matrices
+lat_matrix <- matrix(lat, nrow = length(lon), ncol = length(lat), byrow = TRUE)
+lon_matrix <- matrix(lon, nrow = length(lon), ncol = length(lat), byrow = FALSE)
+
+# repeat code like this for all variables you want
+cf <- ncvar_get(data, "cloud_fraction")
+cf_ice <- ncvar_get(data, "water_cloud_fraction")
+ctp_ice <- ncvar_get(data, "ctp_ice")
+cwp_i_1.6um <- ncvar_get(data, 'cwp_16_ice')
+cwp_i_2.1um <- ncvar_get(data, 'cwp_21_ice')
+cwp_i_2.2um <- ncvar_get(data, 'cwp_22_ice')
+```
+
+```{R}
+# reshape the data to have columns lat, lon, cloud frac, water cloud frac
+cloud_data <- data.frame(
+  lat = as.vector(lat_matrix),
+  lon = as.vector(lon_matrix),
+  cf = as.vector(cf),
+  cf_ice = as.vector(cf_ice),
+  cwp_i_1.6um = as.vector(cwp_i_1.6um),
+  cwp_i_2.1um = as.vector(cwp_i_2.1um),
+  cwp_i_2.2um = as.vector(cwp_i_2.2um),
+  ctp_ice = as.vector(ctp_ice)
+  )|>
+  # (optional, there are a lot of NAs
+    drop_na(cf, cf_ice, cwp_i_1.6um, cwp_i_2.1um, cwp_i_2.2um, ctp_ice)
+```
+
