@@ -55,3 +55,13 @@ cloud_data <- data.frame(
     drop_na(cf, cf_ice, cwp_i_1.6um, cwp_i_2.1um, cwp_i_2.2um, ctp_ice)
 ```
 
+### Likelihood:
+
+
+### Priors:
+
+
+```{r Prior Predictive}
+
+```
+
