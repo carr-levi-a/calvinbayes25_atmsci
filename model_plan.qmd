@@ -2,6 +2,8 @@
 title: "Model Plan"
 author: "Levi Carr"
 format: html
+html:
+   embed-resources: true
 ---
 ```{r, include=FALSE}
 library(ggplot2)
