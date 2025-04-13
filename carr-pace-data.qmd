@@ -65,16 +65,35 @@ cloud_data <- data.frame(
 
 ### Likelihood:
 $$\text{cer_16_ice} \sim \mathrm{Gamma}(\mu_i, \sigma)$$
-$$\ln{\mu_i} = \beta_0 + \beta_1 \;\text{cwp_16_ice}_i + \beta_2 \;\text{ctp_ice}_i $$
-$$\sigma \sim \exp(1)$$
-$$\beta_0 \sim $$
-$$\beta_1 \sim $$
-$$\beta_2 \sim $$
+$$\ln{\mu_i} = \beta_0 + \beta_1 \;\text{ctp_ice}_i + \beta_2 \;\text{cf_ice}_i $$
+$$\sigma \sim Lognormal(0, 1)$$
+$$\beta_0 \sim Cauchy(\ln{125}, \ln{50})$$
+$$\beta_1 \sim Cauchy(0, 1)$$
+$$\beta_2 \sim Norm(0, 1)$$
 
 ### Priors:
-
-
 ```{r Prior Predictive}
+n_sim <- 100 # number of simulated datasets
 
+prior_pred_dist <- tibble(sim_id = c(1:n_sim)) |> # add row numbers to identify each draw from the posterior
+   mutate(b0 = rcauchy(n_sim, log(125), log(50)),
+          b1 = rcauchy(n_sim, 0, 1),
+          b2 = rnorm(n_sim, 0, 1),
+          sigma = rlnorm(n_sim, 0, 1)
+          ) |>
+   rowwise() |>
+   mutate(mu = list(exp(b0 + b1 * ctp_ice + b2 * cf_ice)),
+          ctp_ice = list(cloud_data$ctp_ice),
+          cf_ice = list(cloud_data$cf_ice)
+          ) |>
+   unnest( c(mu, ctp_ice, cf_ice) ) |>
+   ungroup() |>
+   mutate(alpha = mu^2 / sigma^2,
+          lambda = mu / sigma^2
+          ) |>
+   rowwise() |> 
+   mutate( sim_Reff = rgamma(1, rate=alpha, shape = lambda) ) |>
+   ungroup()
+                          
 ```
 
