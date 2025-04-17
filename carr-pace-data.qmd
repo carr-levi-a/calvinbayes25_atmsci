@@ -12,7 +12,8 @@ editor: source
 library(ncdf4)
 library(tidyverse)
 library(dagitty)
-
+library(rethinking)
+library(ggformula)
 ```
 
 Read in PACE data from one .nc file
@@ -34,11 +35,8 @@ lon_matrix <- matrix(lon, nrow = length(lon), ncol = length(lat), byrow = FALSE)
 
 # repeat code like this for all variables you want
 cf <- ncvar_get(data, "cloud_fraction")
-cf_ice <- ncvar_get(data, "water_cloud_fraction")
+cf_ice <- ncvar_get(data, "ice_cloud_fraction")
 ctp_ice <- ncvar_get(data, "ctp_ice")
-cwp_i_1.6um <- ncvar_get(data, 'cwp_16_ice')
-cwp_i_2.1um <- ncvar_get(data, 'cwp_21_ice')
-cwp_i_2.2um <- ncvar_get(data, 'cwp_22_ice')
 ```
 
 ```{R}
@@ -47,14 +45,15 @@ cloud_data <- data.frame(
   lat = as.vector(lat_matrix),
   lon = as.vector(lon_matrix),
   cf = as.vector(cf),
+  cf.z = as.numeric(scale(cf)),
   cf_ice = as.vector(cf_ice),
-  cwp_i_1.6um = as.vector(cwp_i_1.6um),
-  cwp_i_2.1um = as.vector(cwp_i_2.1um),
-  cwp_i_2.2um = as.vector(cwp_i_2.2um),
-  ctp_ice = as.vector(ctp_ice)
+  cf_ice.z = as.numeric(scale(cf_ice)),
+  ctp_ice = as.vector(ctp_ice),
+  ctp_ice.z = as.numeric(scale(ctp_ice)),
+  log_ctp_ice = log(as.vector(ctp_ice))
   )|>
   # (optional, there are a lot of NAs
-    drop_na(cf, cf_ice, cwp_i_1.6um, cwp_i_2.1um, cwp_i_2.2um, ctp_ice)
+    drop_na(cf, cf_ice, ctp_ice)
 ```
 
 ### Causal Diagram:
@@ -65,7 +64,7 @@ cloud_data <- data.frame(
 
 ### Likelihood:
 $$\text{cer_16_ice} \sim \mathrm{Gamma}(\mu_i, \sigma)$$
-$$\ln{\mu_i} = \beta_0 + \beta_1 \;\text{ctp_ice}_i + \beta_2 \;\text{cf_ice}_i $$
+$$\ln{\mu_i} = \beta_0 + \beta_1 \;\text{ctp_ice.z}_i + \beta_2 \;\text{cf_ice.z}_i $$
 $$\sigma \sim Lognormal(0, 1)$$
 $$\beta_0 \sim Cauchy(\ln{125}, \ln{50})$$
 $$\beta_1 \sim Cauchy(0, 1)$$
@@ -75,18 +74,24 @@ $$\beta_2 \sim Norm(0, 1)$$
 ```{r Prior Predictive}
 n_sim <- 100 # number of simulated datasets
 
-prior_pred_dist <- tibble(sim_id = c(1:n_sim)) |> # add row numbers to identify each draw from the posterior
+prior_pred_dist <- tibble(sim_id = c(1:n_sim)) |> 
    mutate(b0 = rcauchy(n_sim, log(125), log(50)),
           b1 = rcauchy(n_sim, 0, 1),
-          b2 = rnorm(n_sim, 0, 1),
+          b2 = rcauchy(n_sim, 0, 1),
           sigma = rlnorm(n_sim, 0, 1)
           ) |>
    rowwise() |>
-   mutate(mu = list(exp(b0 + b1 * ctp_ice + b2 * cf_ice)),
-          ctp_ice = list(cloud_data$ctp_ice),
-          cf_ice = list(cloud_data$cf_ice)
+   mutate(mu = list(exp(b0 + b1*cloud_data$ctp_ice.z + b2*cloud_data$cf_ice)),
+          #log_ctp_ice = list(cloud_data$log_ctp_ice),
+          ctp_ice.z = list(cloud_data$ctp_ice.z),
+          #ctp_ice = list(cloud_data$ctp_ice),
+          cf_ice.z = list(cloud_data$cf_ice.z)
           ) |>
+<<<<<<< HEAD
    unnest(cols = c(mu, ctp_ice, cf_ice) ) |>
+=======
+   unnest(cols =  c(mu, ctp_ice.z, cf_ice.z) ) |>
+>>>>>>> f6f9e4d757a55d5b9a26715bcb810e769602bc48
    ungroup() |>
    mutate(alpha = mu^2 / sigma^2,
           lambda = mu / sigma^2
@@ -94,6 +99,24 @@ prior_pred_dist <- tibble(sim_id = c(1:n_sim)) |> # add row numbers to identify 
    rowwise() |> 
    mutate( sim_Reff = rgamma(1, rate=alpha, shape = lambda) ) |>
    ungroup()
-                          
+```
+
+```{r}
+gf_dens(~sim_Reff, group = ~sim_id, 
+        data = prior_pred_dist)
+```
+
+```{r}
+gf_point(sim_Reff ~ cf_ice.z | sim_id,
+         alpha = 0.7,
+         data = prior_pred_dist |>
+          filter(sim_id < 21) # show just the first 25 sim datasets
+        ) |> gf_lims(y = c(0,10))
+
+gf_point(sim_Reff ~ ctp_ice.z | sim_id,
+         alpha = 0.7,
+         data = prior_pred_dist |>
+          filter(sim_id < 21) # show just the first 25 sim datasets
+        ) |> gf_lims(y = c(0,10))
 ```
 
