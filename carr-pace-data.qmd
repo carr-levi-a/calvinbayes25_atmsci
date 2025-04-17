@@ -86,7 +86,7 @@ prior_pred_dist <- tibble(sim_id = c(1:n_sim)) |> # add row numbers to identify 
           ctp_ice = list(cloud_data$ctp_ice),
           cf_ice = list(cloud_data$cf_ice)
           ) |>
-   unnest( c(mu, ctp_ice, cf_ice) ) |>
+   unnest(cols = c(mu, ctp_ice, cf_ice) ) |>
    ungroup() |>
    mutate(alpha = mu^2 / sigma^2,
           lambda = mu / sigma^2
