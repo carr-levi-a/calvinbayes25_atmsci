@@ -50,3 +50,11 @@ ggdag(causal_diag)
 From prior information, ice clouds tend to have particles with wide distributions in radius, with an apparent peak near $\mu_{R_{eff}} \approx$ 125 $\mu$m and $\sigma_{R_{eff}} \approx$ 50 $\mu$m (cf. DOI: 10.1002/2017EA000296, pg 11). Likewise, ctp_ice spans 2 decades of pressure, but I do not have a reasonable guess for what the mean and standard deviation should be. Thus, I choose to normalize ctp_ice and use an uninformative prior. Fraction_ice is bounded between 0 and 1, but it too does not seem to have previously known information. Lastly, I chose the Lognormal sd prior as to eliminate negative standard deviations. 
 
 In the next week, I will design a prior predictive code and examine it to see the choice of prior and critique its initial values.
+
+### Likelihood:
+$$\text{cer_16_ice} \sim \mathrm{Gamma}(\mu_i, \sigma)$$
+$$\ln{\mu_i} = \beta_0 + \beta_1 \;\text{ctp_ice.z}_i + \beta_2 \;\text{cf_ice.z}_i $$
+$$\sigma \sim Lognormal(0, 1)$$
+$$\beta_0 \sim Cauchy(\ln{125}, \ln{50})$$
+$$\beta_1 \sim Cauchy(0, 1)$$
+$$\beta_2 \sim Norm(0, 1)$$

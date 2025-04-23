@@ -35,8 +35,11 @@ lon_matrix <- matrix(lon, nrow = length(lon), ncol = length(lat), byrow = FALSE)
 
 # repeat code like this for all variables you want
 cf <- ncvar_get(data, "cloud_fraction")
+cth_alb <- ncvar_get(data, "cth_alb")
 cf_ice <- ncvar_get(data, "ice_cloud_fraction")
-ctp_ice <- ncvar_get(data, "ctp_ice")
+ctp <- ncvar_get(data, "ctp")
+cot <- ncvar_get(data, "cth_cot")
+ctt <- ncvar_get(data, "ctt")
 ```
 
 ```{R}
@@ -44,75 +47,86 @@ ctp_ice <- ncvar_get(data, "ctp_ice")
 cloud_data <- data.frame(
   lat = as.vector(lat_matrix),
   lon = as.vector(lon_matrix),
+  alb = as.vector(cth_alb),
+  alb.z = as.vector(scale(cth_alb)),
   cf = as.vector(cf),
   cf.z = as.numeric(scale(cf)),
   cf_ice = as.vector(cf_ice),
   cf_ice.z = as.numeric(scale(cf_ice)),
-  ctp_ice = as.vector(ctp_ice),
-  ctp_ice.z = as.numeric(scale(ctp_ice)),
-  log_ctp_ice = log(as.vector(ctp_ice))
+  ctp = as.vector(ctp),
+  ctp_ice.z = as.numeric(scale(ctp)),
+  log_ctp = log(as.vector(ctp)),
+  log_ctp.z = as.numeric(scale(log(as.vector(ctp)))),
+  cot = as.vector(cot),
+  cot.z = as.numeric(scale(cot)),
+  ctt = as.vector(ctt),
+  ctt.z = as.vector(scale(ctt))
   )|>
   # (optional, there are a lot of NAs
-    drop_na(cf, cf_ice, ctp_ice)
-```
-
-### Causal Diagram:
-```{r}
+    drop_na(cf, alb, cf_ice, ctp, cot, ctt) |>
+   filter(cot < 3.1, ctt > 233.15) # Select valid cirrus range. Rationale: https://journals.ametsoc.org/view/journals/amsm/58/1/amsmonographs-d-16-0010.1.pdf (pg 3)
 
 ```
 
-
-### Likelihood:
-$$\text{cer_16_ice} \sim \mathrm{Gamma}(\mu_i, \sigma)$$
-$$\ln{\mu_i} = \beta_0 + \beta_1 \;\text{ctp_ice.z}_i + \beta_2 \;\text{cf_ice.z}_i $$
-$$\sigma \sim Lognormal(0, 1)$$
-$$\beta_0 \sim Cauchy(\ln{125}, \ln{50})$$
-$$\beta_1 \sim Cauchy(0, 1)$$
-$$\beta_2 \sim Norm(0, 1)$$
 
 ### Priors:
 ```{r Prior Predictive}
-n_sim <- 100 # number of simulated datasets
+n_sim <- 50 # number of simulated datasets
+gp <- CalvinBayes::gamma_params(mean=log(20), sd=log(15))
+shpe <- as.numeric(gp[1])
+rte <- as.numeric(gp[2])
 
 prior_pred_dist <- tibble(sim_id = c(1:n_sim)) |> 
-   mutate(b0 = rcauchy(n_sim, log(125), log(50)),
-          b1 = rcauchy(n_sim, 0, 1),
-          b2 = rcauchy(n_sim, 0, 1),
+   mutate(b0 = rgamma(n_sim, shpe, rte),
+          b1 = rcauchy(n_sim, 1, 2.5),
+          b2 = rcauchy(n_sim, -1, 2),
           sigma = rlnorm(n_sim, 0, 1)
           ) |>
    rowwise() |>
+<<<<<<< HEAD
    mutate(mu = list(exp(b0 + b1*cloud_data$ctp_ice.z + b2*cloud_data$cf_ice)),
           log_ctp_ice = list(cloud_data$log_ctp_ice),
           #ctp_ice.z = list(cloud_data$ctp_ice.z),
           #ctp_ice = list(cloud_data$ctp_ice),
           cf_ice.z = list(cloud_data$cf_ice.z)
+=======
+   mutate(mu = list(exp( (b0) + b2*cloud_data$alb.z) ), # + b1*cloud_data$cf_ice.z 
+          cf = list(cloud_data$cf),
+          cf.z = list(cloud_data$cf.z),
+          cf_ice.z = list(cloud_data$cf_ice.z),
+          alb = list(cloud_data$alb),
+          alb.z = list(cloud_data$alb.z)
+>>>>>>> bc907426a02abe23b7235aba5da03f33933f8a7a
           ) |>
-   unnest(cols =  c(mu, ctp_ice.z, cf_ice.z) ) |>
+   unnest(cols =  c(mu, cf, cf.z, cf_ice.z, alb, alb.z) ) |>
    ungroup() |>
    mutate(alpha = mu^2 / sigma^2,
           lambda = mu / sigma^2
-          ) |>
-   rowwise() |> 
+   ) |>
+   rowwise() |>
    mutate( sim_Reff = rgamma(1, rate=alpha, shape = lambda) ) |>
    ungroup()
 ```
 
 ```{r}
 gf_dens(~sim_Reff, group = ~sim_id, 
-        data = prior_pred_dist)
+        data = prior_pred_dist |>
+           filter(sim_id <21)) |>
+   gf_facet_wrap(~sim_id, scales = 'free') |>
+   gf_lims(y = c(0, 1E4), x = c(0,1E2))
 ```
 
 ```{r}
 gf_point(sim_Reff ~ cf_ice.z | sim_id,
          alpha = 0.7,
          data = prior_pred_dist |>
-          filter(sim_id < 21) # show just the first 25 sim datasets
-        ) |> gf_lims(y = c(0,10))
+          filter(sim_id < 41) # show just the first 20 sim datasets
+        ) |> gf_lims(y = c(0,100))
 
-gf_point(sim_Reff ~ ctp_ice.z | sim_id,
+gf_point(sim_Reff ~ alb.z | sim_id,
          alpha = 0.7,
          data = prior_pred_dist |>
-          filter(sim_id < 21) # show just the first 25 sim datasets
-        ) |> gf_lims(y = c(0,10))
+          filter(sim_id < 41) # show just the first 20 sim datasets
+        ) |> gf_lims(y = c(0,100))
 ```
 
