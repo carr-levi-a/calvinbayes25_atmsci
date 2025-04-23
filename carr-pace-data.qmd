@@ -82,8 +82,8 @@ prior_pred_dist <- tibble(sim_id = c(1:n_sim)) |>
           ) |>
    rowwise() |>
    mutate(mu = list(exp(b0 + b1*cloud_data$ctp_ice.z + b2*cloud_data$cf_ice)),
-          #log_ctp_ice = list(cloud_data$log_ctp_ice),
-          ctp_ice.z = list(cloud_data$ctp_ice.z),
+          log_ctp_ice = list(cloud_data$log_ctp_ice),
+          #ctp_ice.z = list(cloud_data$ctp_ice.z),
           #ctp_ice = list(cloud_data$ctp_ice),
           cf_ice.z = list(cloud_data$cf_ice.z)
           ) |>
