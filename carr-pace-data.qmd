@@ -40,6 +40,7 @@ cf_ice <- ncvar_get(data, "ice_cloud_fraction")
 ctp <- ncvar_get(data, "ctp")
 cot <- ncvar_get(data, "cth_cot")
 ctt <- ncvar_get(data, "ctt")
+cer_16 <- ncvar_get(data, "cer_16")
 ```
 
 ```{R}
@@ -60,7 +61,8 @@ cloud_data <- data.frame(
   cot = as.vector(cot),
   cot.z = as.numeric(scale(cot)),
   ctt = as.vector(ctt),
-  ctt.z = as.vector(scale(ctt))
+  ctt.z = as.vector(scale(ctt)),
+  cer16 = as.vector(cer_16)
   )|>
   # (optional, there are a lot of NAs
     drop_na(cf, alb, cf_ice, ctp, cot, ctt) |>
@@ -68,22 +70,27 @@ cloud_data <- data.frame(
 
 ```
 
+```{r}
+gf_histogram(~cer16, data=cloud_data)
+gf_histogram(~cf_ice.z, data = cloud_data)
+gf_histogram(~alb, data = cloud_data)
+```
+
+categorical variable for liquid cloud or ice cloud?
+
 
 ### Priors:
 ```{r Prior Predictive}
 n_sim <- 50 # number of simulated datasets
-gp <- CalvinBayes::gamma_params(mean=base::log(20), sd=base::log(15))
-shpe <- as.numeric(gp[1])
-rte <- as.numeric(gp[2])
 
 prior_pred_dist <- tibble(sim_id = c(1:n_sim)) |> 
-   mutate(b0 = rcauchy(n_sim, log(20), log(20)),
-          b1 = rcauchy(n_sim, 1, 2),
-          b2 = rcauchy(n_sim, -1, 2),
-          sigma = rlnorm(n_sim, 0, 1)
+   mutate(b0 = rnorm(n_sim, log(20), log(exp(1))),
+        #  b1 = rcauchy(n_sim, , 2),
+        #  b2 = rcauchy(n_sim, -1, 2),
+          sigma = rlnorm(n_sim, log(20), 0.7)
           ) |>
    rowwise() |>
-   mutate(mu = list(exp( b0 + b1*cloud_data$cf_ice.z + b2*cloud_data$alb.z) ), # 
+   mutate(mu = list(exp( b0 ) ), # b1*cloud_data$cf_ice.z + b2*cloud_data$alb.z
           cf.z = list(cloud_data$cf.z),
           cf_ice.z = list(cloud_data$cf_ice.z),
           alb = list(cloud_data$alb),
@@ -95,12 +102,11 @@ prior_pred_dist <- tibble(sim_id = c(1:n_sim)) |>
           lambda = mu / sigma^2
    ) |>
    rowwise() |>
-   mutate( sim_Reff = rgamma(1, rate=alpha, shape = lambda) ) |>
+   mutate( sim_Reff = rgamma(1, rate=lambda, shape = alpha) ) |>
    ungroup()
 ```
 ```{r}
-gf_dist(dist="cauchy", params=c(location=shpe, scale=rte)) |>
-  gf_lims(x=c(-10,10))
+gf_dist(dist="lnorm", params=c(log(20), 0.7))
 ```
 
 ```{r}
@@ -108,20 +114,20 @@ gf_dens(~sim_Reff, group = ~sim_id,
         data = prior_pred_dist |>
            filter(sim_id <21)) |>
    gf_facet_wrap(~sim_id, scales = 'free') |>
-   gf_lims(y = c(0, 1E4), x = c(0,1E2))
+   gf_lims( x = c(0,1E2))
 ```
 
 ```{r}
 gf_point(sim_Reff ~ cf_ice.z | sim_id,
-         alpha = 0.7,
+         alpha = 0.02,
          data = prior_pred_dist |>
-          filter(sim_id < 31) # show just the first 30 sim datasets
+          filter(sim_id < 11) # show just the first 30 sim datasets
         ) |> gf_lims(y = c(0,100))
 
 gf_point(sim_Reff ~ alb.z | sim_id,
-         alpha = 0.7,
+         alpha = 0.02,
          data = prior_pred_dist |>
-          filter(sim_id < 31) # show just the first 30 sim datasets
+          filter(sim_id < 11) # show just the first 30 sim datasets
         ) |> gf_lims(y = c(0,100))
 ```
 
