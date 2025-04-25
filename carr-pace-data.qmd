@@ -20,15 +20,16 @@ Read in PACE data from one .nc file
 
 Read in the 0.1deg or about 10km resolution data (11.1 km?)
 
-```{r}
+### Data Wrangling
+```{r Read in Dataset from NetCDF file}
 data <- nc_open("PACE_OCI.20250330.L3m.DAY.CLOUD.V3_0.1deg.NRT.nc")
 ```
 
 Now extract variables we want:
 
-```{r}
+```{r Grab Data}
 # positions
-lat <- ncvar_get(data, "lat") #columns of data matrices
+lat <- ncvar_get(data, "lat") # columns of data matrices
 lon <- ncvar_get(data, "lon") # rows of data matrices
 lat_matrix <- matrix(lat, nrow = length(lon), ncol = length(lat), byrow = TRUE)
 lon_matrix <- matrix(lon, nrow = length(lon), ncol = length(lat), byrow = FALSE)
@@ -43,91 +44,92 @@ ctt <- ncvar_get(data, "ctt")
 cer_16 <- ncvar_get(data, "cer_16")
 ```
 
-```{R}
-# reshape the data to have columns lat, lon, cloud frac, water cloud frac
+```{R Format Data}
+
 cloud_data <- data.frame(
   lat = as.vector(lat_matrix),
   lon = as.vector(lon_matrix),
   alb = as.vector(cth_alb),
-  alb.z = as.vector(scale(cth_alb)),
-  cf = as.vector(cf),
-  cf.z = as.numeric(scale(cf)),
   cf_ice = as.vector(cf_ice),
   cf_ice.z = as.numeric(scale(cf_ice)),
-  ctp = as.vector(ctp),
-  ctp_ice.z = as.numeric(scale(ctp)),
-  log_ctp = log(as.vector(ctp)),
-  log_ctp.z = as.numeric(scale(log(as.vector(ctp)))),
   cot = as.vector(cot),
   cot.z = as.numeric(scale(cot)),
   ctt = as.vector(ctt),
   ctt.z = as.vector(scale(ctt)),
   cer16 = as.vector(cer_16)
   )|>
-  # (optional, there are a lot of NAs
-    drop_na(cf, alb, cf_ice, ctp, cot, ctt) |>
-   filter(cot < 3.1, ctt > 233.15) # Select valid cirrus range. Rationale: https://journals.ametsoc.org/view/journals/amsm/58/1/amsmonographs-d-16-0010.1.pdf (pg 3)
+   drop_na(cf_ice, cot, ctt) |>   # optional, there are a lot of NAs
+   filter(cot < 3.1, ctt > 233.15) |> # Select cirrus range. Rationale: https://journals.ametsoc.org/view/journals/amsm/58/1/amsmonographs-d-16-0010.1.pdf (pg 3)
+   mutate( ice_idx = ifelse(cf_ice < 0.05, 0, ifelse(cf_ice < 0.95, 1, 2)) ) # No ice: 0, Some ice: 1, All ice: 2
 
 ```
 
-```{r}
+```{r Peek for Training Only, include=FALSE}
 gf_histogram(~cer16, data=cloud_data)
-gf_histogram(~cf_ice.z, data = cloud_data)
-gf_histogram(~alb, data = cloud_data)
+gf_histogram(~cf_ice, data = cloud_data)
 ```
 
-categorical variable for liquid cloud or ice cloud?
+### Prior Predictive:
+```{r Visualize Ideal DSD}
+gp <- CalvinBayes::gamma_params(mean=20, sd=15)
+shpe <- gp[1]
+rte <- gp[2]
+gf_dist(dist="gamma", params=c(shpe, rte))
+```
+```{r Visualize Ideal DSD SD}
+gf_dist('lnorm', params=c(log(20), 0.5))
+```
 
-
-### Priors:
-```{r Prior Predictive}
+```{r Prior Predictive Sim}
 n_sim <- 50 # number of simulated datasets
 
 prior_pred_dist <- tibble(sim_id = c(1:n_sim)) |> 
    mutate(b0 = rnorm(n_sim, log(20), log(exp(1))),
-        #  b1 = rcauchy(n_sim, , 2),
-        #  b2 = rcauchy(n_sim, -1, 2),
-          sigma = rlnorm(n_sim, log(20), 0.7)
+          b1_0 = rcauchy(n_sim, 0, 0.4),
+          b1_1 = rcauchy(n_sim, 0.1, 0.4),
+          b1_2 = rcauchy(n_sim, 0.2, 0.4),
+          sigma = rlnorm(n_sim, log(15), 0.5)
           ) |>
    rowwise() |>
-   mutate(mu = list(exp( b0 ) ), # b1*cloud_data$cf_ice.z + b2*cloud_data$alb.z
-          cf.z = list(cloud_data$cf.z),
-          cf_ice.z = list(cloud_data$cf_ice.z),
-          alb = list(cloud_data$alb),
-          alb.z = list(cloud_data$alb.z)
+   mutate(mu = list(exp( b0 +
+                         b1_0 * ifelse(cloud_data$ice_idx == 0, 1, 0) +
+                         b1_2 * ifelse(cloud_data$ice_idx == 1, 1, 0) +
+                         b1_2 * ifelse(cloud_data$ice_idx == 2, 1, 0) )),
+          ice_idx = list(cloud_data$ice_idx),
+          cf_ice = list(cloud_data$cf_ice),
+          alb = list(cloud_data$alb)
           ) |>
-   unnest(cols =  c(mu, cf.z, cf_ice.z, alb, alb.z) ) |>
+   unnest(cols =  c(mu, ice_idx, cf_ice, alb)) |>
    ungroup() |>
-   mutate(alpha = mu^2 / sigma^2,
-          lambda = mu / sigma^2
+   mutate(alpha = mu / sigma^2,
+          lambda = mu^2 / sigma^2
    ) |>
    rowwise() |>
-   mutate( sim_Reff = rgamma(1, rate=lambda, shape = alpha) ) |>
+   mutate( sim_Reff = rgamma(1, rate = alpha, shape = lambda) ) |>
    ungroup()
 ```
-```{r}
-gf_dist(dist="lnorm", params=c(log(20), 0.7))
-```
 
+
+### Visualize Prior Predictive
 ```{r}
 gf_dens(~sim_Reff, group = ~sim_id, 
         data = prior_pred_dist |>
-           filter(sim_id <21)) |>
+           filter(sim_id <31)) |>
    gf_facet_wrap(~sim_id, scales = 'free') |>
    gf_lims( x = c(0,1E2))
 ```
 
 ```{r}
-gf_point(sim_Reff ~ cf_ice.z | sim_id,
-         alpha = 0.02,
+gf_boxplot(sim_Reff ~ factor(ice_idx) | sim_id,
+         alpha = 0.1,
          data = prior_pred_dist |>
-          filter(sim_id < 11) # show just the first 30 sim datasets
-        ) |> gf_lims(y = c(0,100))
+          filter(sim_id < 21) ) |>
+   gf_lims( y = c(0, 50))
 
-gf_point(sim_Reff ~ alb.z | sim_id,
-         alpha = 0.02,
-         data = prior_pred_dist |>
-          filter(sim_id < 11) # show just the first 30 sim datasets
-        ) |> gf_lims(y = c(0,100))
+# gf_point(sim_Reff ~ alb.z | sim_id,
+#          alpha = 0.02,
+#          data = prior_pred_dist |>
+#           filter(sim_id < 11) # show just the first 10 sim datasets
+#         ) |> gf_lims(y = c(0,100))
 ```
 
