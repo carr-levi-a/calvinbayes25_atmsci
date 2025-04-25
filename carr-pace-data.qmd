@@ -85,9 +85,9 @@ n_sim <- 50 # number of simulated datasets
 
 prior_pred_dist <- tibble(sim_id = c(1:n_sim)) |> 
    mutate(b0 = rnorm(n_sim, log(20), log(exp(1))),
-          b1_0 = rcauchy(n_sim, 0, 0.4),
-          b1_1 = rcauchy(n_sim, 0.1, 0.4),
-          b1_2 = rcauchy(n_sim, 0.2, 0.4),
+          b1_0 = rnorm(n_sim, 0, 0.4),
+          b1_1 = rcauchy(n_sim, 0, 0.4),
+          b1_2 = rnorm(n_sim, 0.2, 0.4),
           sigma = rlnorm(n_sim, log(15), 0.5)
           ) |>
    rowwise() |>
