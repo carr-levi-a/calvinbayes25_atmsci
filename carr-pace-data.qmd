@@ -1,13 +1,14 @@
 ---
-title: "NASA PACE nc files"
-format: 
-  html:
-    embed-resources: true
-    code-tools: true
+title: "Data Wrangling and Prior Predictive"
+format: pdf
+  # html:
+  #   embed-resources: true
+  #   code-tools: true
 editor: source
+
 ---
 
-```{r}
+```{r Libraries}
 #| include: false
 library(ncdf4)
 library(tidyverse)
@@ -59,8 +60,10 @@ cloud_data <- data.frame(
   cer16 = as.vector(cer_16)
   )|>
    drop_na(cf_ice, cot, ctt) |>   # optional, there are a lot of NAs
-   filter(cot < 3.1, ctt > 233.15) |> # Select cirrus range. Rationale: https://journals.ametsoc.org/view/journals/amsm/58/1/amsmonographs-d-16-0010.1.pdf (pg 3)
-   mutate( ice_idx = ifelse(cf_ice < 0.05, 0, ifelse(cf_ice < 0.95, 1, 2)) ) # No ice: 0, Some ice: 1, All ice: 2
+   filter(cot < 3.1, ctt > 233.15) |> 
+   # Select cirrus range. Rationale: https://journals.ametsoc.org/view/journals/amsm/58/1/amsmonographs-d-16-0010.1.pdf (pg 3)
+   mutate( ice_idx = ifelse(cf_ice < 0.05, 0, ifelse(cf_ice < 0.95, 1, 2)) ) 
+   # No ice: 0, Some ice: 1, All ice: 2
 
 ```
 
@@ -77,7 +80,7 @@ rte <- gp[2]
 gf_dist(dist="gamma", params=c(shpe, rte))
 ```
 ```{r Visualize Ideal DSD SD}
-gf_dist('lnorm', params=c(log(20), 0.5))
+gf_dist('norm', params=c(-0.1, 0.4))
 ```
 
 ```{r Prior Predictive Sim}
@@ -85,15 +88,21 @@ n_sim <- 50 # number of simulated datasets
 
 prior_pred_dist <- tibble(sim_id = c(1:n_sim)) |> 
    mutate(b0 = rnorm(n_sim, log(20), log(exp(1))),
-          b1_0 = rnorm(n_sim, 0, 0.4),
-          b1_1 = rcauchy(n_sim, 0, 0.4),
-          b1_2 = rnorm(n_sim, 0.2, 0.4),
+          b1_0 = rnorm(n_sim, -0.1, 0.2), 
+          # I expect the effective radius to decrease from average for 
+          # (supercooled) non precipiating liquid clouds 
+          b1_1 = rnorm(n_sim, 0.05, 0.4), 
+          # I expect the effective radius to stay around average for 
+          # intermediate liquid/ice states. I expect a larger variance here
+          b1_2 = rnorm(n_sim, 0.1, 0.2), 
+          # I expect the effective radius to increase for ice clouds. 
+          # Ice crystals tend to be bigger in non precipitating clouds
           sigma = rlnorm(n_sim, log(15), 0.5)
           ) |>
    rowwise() |>
    mutate(mu = list(exp( b0 +
                          b1_0 * ifelse(cloud_data$ice_idx == 0, 1, 0) +
-                         b1_2 * ifelse(cloud_data$ice_idx == 1, 1, 0) +
+                         b1_1 * ifelse(cloud_data$ice_idx == 1, 1, 0) +
                          b1_2 * ifelse(cloud_data$ice_idx == 2, 1, 0) )),
           ice_idx = list(cloud_data$ice_idx),
           cf_ice = list(cloud_data$cf_ice),
@@ -111,10 +120,10 @@ prior_pred_dist <- tibble(sim_id = c(1:n_sim)) |>
 
 
 ### Visualize Prior Predictive
-```{r}
+```{r Show R_eff sims}
 gf_dens(~sim_Reff, group = ~sim_id, 
         data = prior_pred_dist |>
-           filter(sim_id <31)) |>
+           filter(sim_id <21)) |>
    gf_facet_wrap(~sim_id, scales = 'free') |>
    gf_lims( x = c(0,1E2))
 ```
@@ -125,6 +134,15 @@ gf_boxplot(sim_Reff ~ factor(ice_idx) | sim_id,
          data = prior_pred_dist |>
           filter(sim_id < 21) ) |>
    gf_lims( y = c(0, 50))
+```
+
+These boxplots suggest that there is mixed trending in how the ice category affects the effective radius. For several, the radius increases by increasing ice; for several, the radius decreases by increasing ice; though few of them are the same across all categories.
+
+```{R R_eff split into liquid & mix & ice}
+gf_dens(~sim_Reff | factor(ice_idx), group = ~sim_id, 
+        data = prior_pred_dist |> filter(sim_Reff > 0.1),
+         alpha = 0.6) |>
+   gf_lims(x = c(0,100))
 
 # gf_point(sim_Reff ~ alb.z | sim_id,
 #          alpha = 0.02,
@@ -132,4 +150,4 @@ gf_boxplot(sim_Reff ~ factor(ice_idx) | sim_id,
 #           filter(sim_id < 11) # show just the first 10 sim datasets
 #         ) |> gf_lims(y = c(0,100))
 ```
-
+All categories--liquid clouds (0), mixed phase clouds (1), and ice clouds (2)--produce many distributions with modes centered near very small radii. This is likely unphysical as there in theory should be few droplets with effective radius ~ 1 $\mathrm{\mu}$m.
