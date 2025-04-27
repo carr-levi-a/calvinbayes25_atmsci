@@ -7,9 +7,13 @@ format: html
 #| include: false
 library(ncdf4)
 library(tidyverse)
-library(dagitty)
-library(rethinking)
+library(mosaic)
 library(ggformula)
+library(rethinking)
+library(rstan)
+library(CalvinBayes)
+library(bayesplot)
+library(tidybayes)
 ```
 
 Read in PACE data from one .nc file
@@ -62,44 +66,68 @@ cloud_data <- data.frame(
 
 ```
 
-```{r}
+```{r Declare Model}
 stan_cirrus_reff_1 <- '
 data {
   int<lower=1> n;     // number of observations
   vector<lower=0>[n] r_eff;    // response
   array[n] int ice_idx; // predictor
 }
+
 parameters {
-  real<lower=0> sigma;  // sd of gamma dist
+  real<lower=0> sigma;  // gamma likelihood sd
   real b0;               // intercept
   vector[3] b1;         // parameters for cloud phase
 }
+
 model {
   vector[n] mu;
   vector[n] alpha;
   vector[n] lambda;
   for ( i in 1:n ) {
-    mu[i] = exp(b0 + b1 * max_depth_scaled[i] + b2[foraging_dive_ix[i]]);
-    alpha[i] = mu[i] / sigma^2;
+    mu[i] = exp(b0 + b1[ice_idx[i]]); // log link function
+    alpha[i] = mu[i] / sigma^2; // diff from DR gamma example
     lambda[i] = mu[i]^2 / sigma^2;
   }
-  
-  b0 ~ cauchy(-0.7, 0.5);
-  b1 ~ cauchy(0, 0.5);
-  b2 ~ cauchy(0, 0.5);
-  sigma ~ lognormal(0,1);
-  dive_dur ~ gamma(alpha, lambda); // have to use alpha, lambda parameterization for gamma()
+  b0 ~ normal(log(20), log(exp(1)));
+  b1[1] ~ normal(-0.1, 0.2);
+  b1[2] ~ normal(0.005, 0.4);
+  b1[3] ~ normal(0.1, 0.2);
+  sigma ~ lognormal(log(15), 0.5);
+  r_eff ~ gamma(alpha, lambda);
 } 
+
 generated quantities {
  // this is not really required - only if you want values of omega, alpha, beta included in your fitted model
   vector[n] mu;
   vector[n] alpha;
   vector[n] lambda;
   for (i in 1:n) {
-    mu[i] = exp(b0 + b1 * max_depth_scaled[i] + b2[foraging_dive_ix[i]]); // if you want stan to compute expected values for each data row
-    alpha[i] = mu[i]^2 / sigma^2; // if you want the beta parameters alpha and lambda for each row
-    lambda[i] = mu[i] / sigma^2;
+    mu[i] = exp(b0 + b1[ice_idx[i]]); // if you want stan to compute expected values for each data row
+    alpha[i] = mu[i] / sigma^2; // if you want the beta parameters alpha and lambda for each row
+    lambda[i] = mu[i]^2 / sigma^2;
   }
 }'
+```
+
+```{r Transpose Data}
+stan_cirrus_data <- compose_data(cloud_data)
+```
+```{r Model Fit}
+cirrus_fit_1 <- rstan::stan(model_code = stan_cirrus_reff_1,
+                  data = stan_cirrus_data,
+                  chains = 1, 
+                  iter = 2000)
+
+```
+```{R Save local copy}
+model_file <- "cirrus_fit_1.RDS"
+saveRDS(cirrus_fit_1, file = model_file)
+```
+
+```{r Check Convergence}
+cirrus_fit_1
+mcmc_rank_overlay(cirrus_fit_1)
+mcmc_trace(cirrus_fit_1)
 ```
 
