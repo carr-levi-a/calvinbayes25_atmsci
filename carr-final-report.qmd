@@ -1,0 +1,52 @@
+---
+title: "STAT 341 Final Report"
+author: "Levi carr"
+format: html
+---
+### Research Question
+A clear, concise verbal statement of what you are trying to learn by fitting this model
+
+### Causal Diagram
+Draw it, and interpret it to determine which predictors are in and out of your model! May be drawn in R using dagitty(), or in other software if moderators are included
+
+### Rationales for Priors
+In paragraphs or bullet points, explain how and why you chose the priors. Include rationales for which distributions were used as well as parameter values chosen. If any sources were used for prior information, cite them in the text and provide a works cited section at the end. MLA style or any other consistent citation style is ok.
+
+### Model Description 
+Write this in our class notation style, formatting mathematical symbols and Greek letters correctly. (Examples available.)
+
+### Prior Predictive Distribution - show and interpret 
+If your process of defining priors was iterative, you can combine this section with the “Prior Rationales” section and walk the reader through your entire process.
+
+### Fit your Model 
+You can fit via quadratic approximation (quap()) or MCMC (introduced in class starting 3/20). Some add-ons are only possible if you use MCMC (a more professional approach).
+
+### Present the Posterior - show and interpret
+You may include any graphs or summary statistics of your choice that you think are useful in understanding the posterior.
+
+### Model Comparison - show and interpret any necessary 
+Completing this step may require fitting additional models that include some subset of your full set of predictors.
+
+### Discussion/Answer to Research Question 
+Provide a clear answer to your question of interest, referring to evidence presented earlier.
+
+### ADD-ON: Show and discuss diagnostics for fit convergence 	
+This is only possible if your model was fitted using MCMC rather than quap()
+
+### ADD-ON: Model is a GLM, or otherwise uses non-Normal distribution(s) to help define the likelihood 
+This is about the distributions used to define the likelihood, not the priors.
+
+This model is a GLM. The likelihood for droplet size distributions (DSDs) which produce $\mathrm{R_eff}$ is a Gamma distribution (Ulbrich 1983 and references therein). This is because  I assume this distribution holds for clouds of different phase. 
+
+### ADD-ON: Categorical predictor(s) 
+You can earn this credit if your model includes one or more categorical predictors appropriately (it’s not necessary to have a section in the report dedicated to it).
+
+### ADD-ON: Measurement error 
+You can earn this credit if your model accounts for measurement error appropriately (it’s not necessary to have a section in the report dedicated to it).
+
+### ADD-ON: Missing data 
+You can earn this credit if your model deals with missing data by a method other than simple omission (it’s not necessary to have a section in the report dedicated to it).
+
+### ADD-ON: Github
+A GitHub account was used. Data and files used here can be found at https://github.com/carr-levi-a/calvinbayes25_atmsci.
+
