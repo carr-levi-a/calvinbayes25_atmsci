@@ -67,7 +67,7 @@ cloud_data <- data.frame(
 ```
 
 ```{r Declare Model}
-stan_cirrus_reff_1 <- '
+stan_cirrus_reff <- '
 data {
   int<lower=1> n;     // number of observations
   vector<lower=0>[n] r_eff;    // response
@@ -97,16 +97,6 @@ model {
   r_eff ~ gamma(alpha, lambda);
 } 
 
-generated quantities {
- // this is not really required - only if you want values of omega, alpha, beta included in your fitted model
-  vector[n] mu;
-  vector[n] alpha;
-  vector[n] lambda;
-  for (i in 1:n) {
-    mu[i] = exp(b0 + b1[ice_idx[i]]); // if you want stan to compute expected values for each data row
-    alpha[i] = mu[i] / sigma^2; // if you want the beta parameters alpha and lambda for each row
-    lambda[i] = mu[i]^2 / sigma^2;
-  }
 }'
 ```
 
@@ -114,20 +104,20 @@ generated quantities {
 stan_cirrus_data <- compose_data(cloud_data)
 ```
 ```{r Model Fit}
-cirrus_fit_1 <- rstan::stan(model_code = stan_cirrus_reff_1,
+cirrus_fit <- rstan::stan(model_code = stan_cirrus_reff,
                   data = stan_cirrus_data,
                   chains = 1, 
                   iter = 500)
 
 ```
 ```{R Save local copy}
-model_file <- "cirrus_fit_1.RDS"
-saveRDS(cirrus_fit_1, file = model_file)
+model_file <- "cirrus_fit_3.RDS"
+saveRDS(cirrus_fit, file = model_file)
 ```
 
 ```{r Check Convergence}
-#cirrus_fit_1
-#mcmc_rank_overlay(cirrus_fit_1, pars=c(b0, b1[1],b1[2],b1[3]))
-mcmc_trace(cirrus_fit_1, pars=c('b0', 'b1[1]','b1[2]','b1[3]'))
+cirrus_fit_2
+mcmc_rank_overlay(cirrus_fit, pars=c(b0, b1[1],b1[2],b1[3]))
+mcmc_trace(cirrus_fit, pars=c('b0', 'b1[1]','b1[2]','b1[3]'))
 ```
 
