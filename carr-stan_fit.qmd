@@ -103,21 +103,27 @@ model {
 ```{r Transpose Data}
 stan_cirrus_data <- compose_data(cloud_data)
 ```
-```{r Model Fit}
-cirrus_fit <- rstan::stan(model_code = stan_cirrus_reff,
-                  data = stan_cirrus_data,
-                  chains = 1, 
-                  iter = 500)
 
-```
-```{R Save local copy}
+```{r Model Fit}
+refit_model <- FALSE
 model_file <- "cirrus_fit_3.RDS"
-saveRDS(cirrus_fit, file = model_file)
+
+if (refit_model){
+  cirrus_fit <- stan(model_code = stan_gamma_whale_dives,
+                  data = stan_whale_data,
+                  chains = 4, 
+                  iter = 2000)
+  saveRDS(cirrus_fit, file = model_file)
+  
+}else{
+  cirrus_fit <- readRDS('cirrus_fit_2')
+}
+
 ```
 
 ```{r Check Convergence}
-cirrus_fit_2
-mcmc_rank_overlay(cirrus_fit, pars=c(b0, b1[1],b1[2],b1[3]))
+cirrus_fit
+mcmc_rank_overlay(cirrus_fit, pars=c('b0', 'b1[1]','b1[2]','b1[3]'))
 mcmc_trace(cirrus_fit, pars=c('b0', 'b1[1]','b1[2]','b1[3]'))
 ```
 
