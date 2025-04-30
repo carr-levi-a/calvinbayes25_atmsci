@@ -96,6 +96,12 @@ model {
   sigma ~ lognormal(log(15), 0.5);
   r_eff ~ gamma(alpha, lambda);
 } 
+generated quantities {
+vector[n] log_lik;
+  for (i in 1:n) {
+    log_lik[i] = gamma_lpdf(response[i] | alpha[i], lambda[i]); 
+  } 
+}
 
 }'
 ```
