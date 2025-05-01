@@ -51,11 +51,8 @@ cloud_data <- data.frame(
   lon = as.vector(lon_matrix),
   alb = as.vector(cth_alb),
   cf_ice = as.vector(cf_ice),
-  cf_ice.z = as.numeric(scale(cf_ice)),
   cot = as.vector(cot),
-  cot.z = as.numeric(scale(cot)),
   ctt = as.vector(ctt),
-  ctt.z = as.vector(scale(ctt)),
   r_eff = as.vector(cer_16)
   )|>
    drop_na(cf_ice, cot, ctt, r_eff) |>   # optional, there are a lot of NAs
@@ -96,18 +93,19 @@ model {
   sigma ~ lognormal(log(15), 0.5);
   r_eff ~ gamma(alpha, lambda);
 } 
-generated quantities {
-  vector[n] mu;
-  vector[n] alpha;
-  vector[n] lambda;
-  vector[n] log_lik;
-  for (i in 1:n) {
-    mu[i] = exp(b0 + b1[ice_idx[i]]); // log link function
-    alpha[i] = mu[i] / sigma^2; 
-    lambda[i] = mu[i]^2 / sigma^2;
-    log_lik[i] = gamma_lpdf(r_eff | alpha[i], lambda[i]); 
-  } 
-}'
+//generated quantities {
+//  vector[n] mu;
+//  vector[n] alpha;
+//  vector[n] lambda;
+//  vector[n] log_lik;
+//  for (i in 1:n) {
+//    mu[i] = exp(b0 + b1[ice_idx[i]]);
+//    alpha[i] = mu[i] / sigma^2; 
+//    lambda[i] = mu[i]^2 / sigma^2;
+//    log_lik[i] = gamma_lpdf(r_eff | alpha[i], lambda[i]); 
+//  } 
+//}
+'
 ```
 
 ```{r Transpose Data}

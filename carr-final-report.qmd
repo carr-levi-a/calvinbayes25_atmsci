@@ -4,17 +4,39 @@ author: "Levi carr"
 format: html
 ---
 ### Research Question
-A clear, concise verbal statement of what you are trying to learn by fitting this model
+In cirrus clouds, how does the effective radius of the droplets change with ice composition? 
 
 ### Causal Diagram
 Draw it, and interpret it to determine which predictors are in and out of your model! May be drawn in R using dagitty(), or in other software if moderators are included
+
+### ADD-ON: Categorical predictor(s) 
+I have a post processing variable from the data set called `cf_ice` which describes how much of the cloud is ice. `cf_ice` ranges from 0 to 1 where 0 is an all liquid water cloud and 1 is an all ice cloud. By looking at the distribution of `cf_ice` on other days, a pattern of two high density peaks around 0 and 1 with a few cases in between is predominant. I therefore separate the data into three groups: "no ice" (0.05 > `cf_ice`), "some ice" (0.05 < `cf_ice` < 0.95), and "all ice" (`cf_ice` > 0.95).
 
 ### Rationales for Priors
 In paragraphs or bullet points, explain how and why you chose the priors. Include rationales for which distributions were used as well as parameter values chosen. If any sources were used for prior information, cite them in the text and provide a works cited section at the end. MLA style or any other consistent citation style is ok.
 
 ### Model Description 
-Write this in our class notation style, formatting mathematical symbols and Greek letters correctly. (Examples available.)
-
+ $$
+ R_{eff} \sim \mathrm{Gamma}(\mu_i, \sigma)
+ $$
+ $$
+ \ln(\mu_i) = \beta_0 + \beta_1 \left[ \text{ice_fraction}_i \right]
+ $$
+ $$
+ \beta_0 \sim \mathrm{Normal}(\ln(20), \ln(e))
+ $$
+ $$
+ \beta_1[\text{no ice}] \sim \mathrm{Normal}(-0.1, 0.2)
+ $$
+ $$
+ \beta_1[\text{some ice}] \sim \mathrm{Normal}(0.005, 0.4)
+ $$
+ $$
+ \beta_1[\text{all ice}] \sim \mathrm{Normal}(0.1, 0.2)
+ $$
+ $$
+ \sigma \sim \mathrm{Lognormal}(\ln(15), 0.5)
+ $$
 ### Prior Predictive Distribution - show and interpret 
 If your process of defining priors was iterative, you can combine this section with the “Prior Rationales” section and walk the reader through your entire process.
 
@@ -38,15 +60,6 @@ This is about the distributions used to define the likelihood, not the priors.
 
 This model is a GLM. The likelihood for droplet size distributions (DSDs) which produce $\mathrm{R_eff}$ is a Gamma distribution (Ulbrich 1983 and references therein). This is because  I assume this distribution holds for clouds of different phase. 
 
-### ADD-ON: Categorical predictor(s) 
-You can earn this credit if your model includes one or more categorical predictors appropriately (it’s not necessary to have a section in the report dedicated to it).
-
-### ADD-ON: Measurement error 
-You can earn this credit if your model accounts for measurement error appropriately (it’s not necessary to have a section in the report dedicated to it).
-
-### ADD-ON: Missing data 
-You can earn this credit if your model deals with missing data by a method other than simple omission (it’s not necessary to have a section in the report dedicated to it).
-
 ### ADD-ON: Github
-A GitHub account was used. Data and files used here can be found at https://github.com/carr-levi-a/calvinbayes25_atmsci.
+A GitHub repository was used. Data and files used here can be found at https://github.com/carr-levi-a/calvinbayes25_atmsci.
 
