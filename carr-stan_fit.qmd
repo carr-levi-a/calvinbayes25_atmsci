@@ -22,7 +22,7 @@ Read in the 0.1deg or about 10km resolution data (11.1 km?)
 
 ### Data Wrangling
 ```{r Read in Dataset from NetCDF file}
-data <- nc_open("PACE_OCI.20250330.L3m.DAY.CLOUD.V3_0.1deg.NRT.nc")
+data <- nc_open("PACE_OCI.20250402.L3m.DAY.CLOUD.V3_0.1deg.NRT.nc")
 ```
 
 Now extract variables we want:
@@ -97,12 +97,16 @@ model {
   r_eff ~ gamma(alpha, lambda);
 } 
 generated quantities {
-vector[n] log_lik;
+  vector[n] mu;
+  vector[n] alpha;
+  vector[n] lambda;
+  vector[n] log_lik;
   for (i in 1:n) {
-    log_lik[i] = gamma_lpdf(response[i] | alpha[i], lambda[i]); 
+    mu[i] = exp(b0 + b1[ice_idx[i]]); // log link function
+    alpha[i] = mu[i] / sigma^2; 
+    lambda[i] = mu[i]^2 / sigma^2;
+    log_lik[i] = gamma_lpdf(r_eff | alpha[i], lambda[i]); 
   } 
-}
-
 }'
 ```
 
@@ -111,12 +115,12 @@ stan_cirrus_data <- compose_data(cloud_data)
 ```
 
 ```{r Model Fit}
-refit_model <- FALSE
+refit_model <- TRUE
 model_file <- "cirrus_fit_3.RDS"
 
 if (refit_model){
-  cirrus_fit <- stan(model_code = stan_gamma_whale_dives,
-                  data = stan_whale_data,
+  cirrus_fit <- stan(model_code = stan_cirrus_reff,
+                  data = cloud_data,
                   chains = 4, 
                   iter = 2000)
   saveRDS(cirrus_fit, file = model_file)
