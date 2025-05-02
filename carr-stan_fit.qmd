@@ -39,7 +39,8 @@ cf <- ncvar_get(data, "cloud_fraction")
 cth_alb <- ncvar_get(data, "cth_alb")
 cf_ice <- ncvar_get(data, "ice_cloud_fraction")
 ctp <- ncvar_get(data, "ctp")
-cot <- ncvar_get(data, "cth_cot")
+cot <- ncvar_get(data,
+                 "cth_cot")
 ctt <- ncvar_get(data, "ctt")
 cer_16 <- ncvar_get(data, "cer_16")
 ```
@@ -93,18 +94,18 @@ model {
   sigma ~ lognormal(log(15), 0.5);
   r_eff ~ gamma(alpha, lambda);
 } 
-//generated quantities {
-//  vector[n] mu;
-//  vector[n] alpha;
-//  vector[n] lambda;
-//  vector[n] log_lik;
-//  for (i in 1:n) {
-//    mu[i] = exp(b0 + b1[ice_idx[i]]);
-//    alpha[i] = mu[i] / sigma^2; 
-//    lambda[i] = mu[i]^2 / sigma^2;
-//    log_lik[i] = gamma_lpdf(r_eff | alpha[i], lambda[i]); 
-//  } 
-//}
+generated quantities {
+  vector[n] mu;
+  vector[n] alpha;
+  vector[n] lambda;
+  vector[n] log_lik;
+  for (i in 1:n) {
+    mu[i] = exp(b0 + b1[ice_idx[i]]);
+    alpha[i] = mu[i] / sigma^2; 
+    lambda[i] = mu[i]^2 / sigma^2;
+    log_lik[i] = gamma_lpdf(r_eff[i] | alpha[i], lambda[i]); 
+  } 
+}
 '
 ```
 
@@ -118,9 +119,9 @@ model_file <- "cirrus_fit_3.RDS"
 
 if (refit_model){
   cirrus_fit <- stan(model_code = stan_cirrus_reff,
-                  data = cloud_data,
-                  chains = 4, 
-                  iter = 2000)
+                  data = stan_cirrus_data,
+                  chains = 1, 
+                  iter = 200)
   saveRDS(cirrus_fit, file = model_file)
   
 }else{
