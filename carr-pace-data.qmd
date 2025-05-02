@@ -80,24 +80,24 @@ rte <- gp[2]
 gf_dist(dist="gamma", params=c(shpe, rte))
 ```
 ```{r Visualize Ideal DSD SD}
-gf_dist('norm', params=c(-0.1, 0.4))
+gf_dist('lnorm', params=c(meanlog = log(15), sdlog = 0.5))
 ```
 
 ```{r Prior Predictive Sim}
 n_sim <- 50 # number of simulated datasets
 
 prior_pred_dist <- tibble(sim_id = c(1:n_sim)) |> 
-   mutate(b0 = rnorm(n_sim, log(20), log(exp(1))),
-          b1_0 = rnorm(n_sim, -0.1, 0.2), 
+   mutate(b0 = rnorm(n_sim, log(20), log(5)),
+          b1_0 = rstudent(n_sim, nu=2, mu=log(19/20), sigma=-0.1), 
           # I expect the effective radius to decrease from average for 
-          # (supercooled) non precipiating liquid clouds 
-          b1_1 = rnorm(n_sim, 0.05, 0.4), 
+          # (supercooled) non precipitating liquid clouds 
+          b1_1 = rstudent(n_sim, nu=2, mu=log(1), sigma=0.2), 
           # I expect the effective radius to stay around average for 
           # intermediate liquid/ice states. I expect a larger variance here
-          b1_2 = rnorm(n_sim, 0.1, 0.2), 
+          b1_2 = rstudent(n_sim, nu=2, mu=log(21/20), sigma=-0.1), 
           # I expect the effective radius to increase for ice clouds. 
           # Ice crystals tend to be bigger in non precipitating clouds
-          sigma = rlnorm(n_sim, log(15), 0.5)
+          sigma = rlnorm(n_sim, log(10), 0.5)
           ) |>
    rowwise() |>
    mutate(mu = list(exp( b0 +
