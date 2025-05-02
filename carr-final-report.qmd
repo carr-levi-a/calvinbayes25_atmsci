@@ -113,10 +113,11 @@ Completing this step may require fitting additional models that include some sub
 Provide a clear answer to your question of interest, referring to evidence presented earlier.
 
 ### Data Availability
-All data is available upon request through GitHub repository was used. Data and files used here can be found at https://github.com/carr-levi-a/calvinbayes25_atmsci.
+All data is available upon request through GitHub. Data and files used here can be found at https://github.com/carr-levi-a/calvinbayes25_atmsci.
 
 ### References:
 Hansen, J.E., Travis, L.D. Light scattering in planetary atmospheres. Space Sci Rev 16, 527–610 (1974). https://doi.org/10.1007/BF00168069
 
 Heymsfield, A. J., et al. Cirrus Clouds. Meteor. Monogr. 58, 2.1–2.26 (2017). https://doi.org/10.1175/AMSMONOGRAPHS-D-16-0010.1 
 
+Ocean Color Instrument. Accessed 05/01/2025. https://pace.oceansciences.org/oci.htm
