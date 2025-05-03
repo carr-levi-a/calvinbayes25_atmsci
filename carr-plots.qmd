@@ -18,7 +18,8 @@ theme_set(theme_classic(base_size=16))
 ```
 
 ```{r Read In RDS File}
-cirrus_fit <- readRDS('cirrus_fit_2')
+#cirrus_fit <- readRDS('cirrus_fit_2')
+cirrus_fit <- cirrus_fit_w_mixed_phase
 cirrus_fit_samps <- as.data.frame(cirrus_fit) |> rename(Mean_Reff = b0,
                                                         No_Ice = `b1[1]`,
                                                         Some_Ice = `b1[2]`,
@@ -38,21 +39,21 @@ WAIC(cirrus_fit, pointwise = TRUE)
 
 ```{r Plot Priors}
 gf_dens(~Mean_Reff, data=cirrus_fit_samps, linewidth = 2, color = 'black') |>
-  gf_labs(title='Mean R_eff for Cirrus Clouds on March 30, 2025', ylab=('Posterior Density'))
+  gf_labs(title='ln(R_eff) for Cirrus Clouds on April 2, 2025', ylab=('Posterior Density'))
 gf_dens(~No_Ice, data=cirrus_fit_samps, linewidth = 2, color = 'black') |>
-  gf_labs(title='Mean R_eff for No-Ice Cirrus Clouds on March 30, 2025', ylab=('Posterior Density'))
+  gf_labs(title='ln(R_eff) for No-Ice Cirrus Clouds on April 2, 2025', ylab=('Posterior Density'))
 gf_dens(~Some_Ice, data=cirrus_fit_samps, linewidth = 2, color='black') |>
-  gf_labs(title='Mean R_eff for Some-Ice Cirrus Clouds on March 30, 2025', ylab=('Posterior Density'))
+  gf_labs(title='ln(R_eff) for Some-Ice Cirrus Clouds on April 2, 2025', ylab=('Posterior Density'))
 gf_dens(~All_Ice, data=cirrus_fit_samps, linewidth = 2, color='black') |>
-  gf_labs(title='Mean R_eff for All-Ice Cirrus Clouds on March 30, 2025', ylab=('Posterior Density'))
+  gf_labs(title='ln(R_eff) for All-Ice Cirrus Clouds on April 2, 2025', ylab=('Posterior Density'))
 ```
 
 ```{r Plot Prior Diffs}
-gf_dens(~(Some_Ice-No_Ice), data=cirrus_fit_samps, linewidth=2, color='blue')|> gf_labs(title="R_eff Difference Between Some-Ice and No-Ice Cirrus Clouds",
+gf_dens(~(Some_Ice-No_Ice), data=cirrus_fit_samps, linewidth=2, color='blue')|> gf_labs(title="R_eff Difference in Cirrus Cloud Phase",
                                                               ylab("Posterior Density"))
-gf_dens(~(All_Ice-Some_Ice), data=cirrus_fit_samps, linewidth=2, color='royalblue')|> gf_labs(title="R_eff Difference Between All-Ice and Some-Ice Cirrus Clouds",
+gf_dens(~(All_Ice-Some_Ice), data=cirrus_fit_samps, linewidth=2, color='royalblue')|> gf_labs(title="R_eff Difference in Cirrus Cloud Phase",
                                                               ylab("Posterior Density"))
-gf_dens(~(All_Ice-No_Ice), data=cirrus_fit_samps, linewidth=2, color='skyblue')|> gf_labs(title="R_eff Difference Between All-Ice and No-Ice Cirrus Clouds",
+gf_dens(~(All_Ice-No_Ice), data=cirrus_fit_samps, linewidth=2, color='skyblue')|> gf_labs(title="R_eff Difference in Cirrus Cloud Phase",
                                                               ylab("Posterior Density"))
 ```
 
