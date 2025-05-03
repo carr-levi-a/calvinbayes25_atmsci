@@ -1,8 +1,12 @@
 ---
 title: "STAT 341 Final Report"
 author: "Levi carr"
-format: html
+format: pdf
 ---
+```{r, include=FALSE}
+cirrus_fit_w_mixed_phase <- readRDS("cirrus_fit_3.RDS")
+cirrus_fit_wo_mixed_phase <- readRDS("cirrus_fit_no_mixed_phase.RDS")
+```
 ### Research Question
 In cirrus clouds, how does the effective radius of the droplets change with ice composition? 
 
@@ -12,6 +16,8 @@ Draw it, and interpret it to determine which predictors are in and out of your m
 ### The PACE Mission and the Cloud Dataset
 #### Mission Overview
 PACE (Plankton, Aerosol, Cloud, ocean Ecosystem) is a NASA science mission launched into on 08-Feb 2024 to extend and improve observations of global ocean biology, aerosols, and clouds. PACE has three science instruments aboard to examine the earth from above: the SPEXone polarimeter, the HARP2 polarimeter, and the Ocean Color Instrument (OCI). From NASA: "PACE's primary sensor, the Ocean Color Instrument (OCI), is a highly advanced optical spectrometer that measures properties of light over portions of the electromagnetic spectrum. It enables continuous measurement of light at finer wavelength resolution than previous NASA satellite sensors, extending key system ocean color data records for climate studies." This instrument yields atmospheric data products that I use for my analysis of cirrus cloud effective radii.
+
+The satellite's orbital period is one solar day, so data is naturally binned by day. From the data, I selected a "training" day (where I looked directly at the data) and a "test" day which I fit the model to. These days were March 30th and April 2nd, respectively. The data files used are given in the "Data Availability" section.
 
 #### Selecting Cirrus Clouds
 From the cloud data products we also have variables such as the optical thickness $\tau$ (a measure of transmission) and cloud top pressure $T_{top}$. Heymsfield et al. (2017) state that cirrus clouds are observed to have cloud top temperatures greater than $-40^{\circ}$ C and optical thicknesses less than 3.1. Thus, I select only values from the cloud data set for $T_{top} > 233.15$ K and $\tau <3.1$. 
@@ -33,8 +39,6 @@ The effective radius ($R_eff$) of droplets in clouds has been identified in the 
  \beta_0 \sim \mathrm{Normal}(\ln(20), \ln(e))
  $$
  
- 
-
 It is very hard to track down the size of liquid water in cirrus clouds, so I hypothesize that the radius of liquid water droplets are smaller in clouds to the merit that liquid water expands when it freezes, often into shapes that are not minimal surfaces; this is to say that ice's effective radius should be larger. Since $\beta_0$ is the global average which includes the ice clouds, my hypothesis suggests that the radii are smaller than the average effective radius of cirrus clouds.
 
 Assume that the hypothesis is true and that all ice and no ice clouds are found in equal proportions across the globe. It should be the case then that the global average is the average of the means of the all ice and no ice cloud droplet distributions. Since water expands by ~10%, the mean effective radius for no ice clouds should be smaller than the global average by ~5% or ~1$\mu m$. Likewise, the mean effective radius for all ice clouds should be ~5% larger than the global average, or ~1$\mu m$. How do we get this to work with the link function? Start by writing
@@ -96,24 +100,54 @@ As seen from the prior predictive distribution(s), the three populations are nea
 ![Boxplots of the first 20 simulated values of $mu$ with respect to ice content. No ice is seen on the left, some ice in the center, and all ice on the right of each pane.](prior_pred3.png)
 
 
-
 ### Model 
-This model was fit by the MCMC package cmdstan. Four chains were computed with 2000 total iterations each. Effective iterations ranged from 500-1200. No other settings were altered.
+This model was fit by the MCMC package cmdstan. Four chains were computed with 2000 total iterations each using `adapt_delta = 0.8`
+
+#### Diagnostics for Fit Convergence 	
+I analyzed two fits of convergence readily available in stan: neff and Rhat. This model uses 1000 sampling iterations. The neff for the parameters associated with the categorical predictors is ~500 for all, indicating that the sampling process was mildly inefficient. Rhat for all parameters associated with the predictors was 1.00. 
+```{r}
+cirrus_fit_w_mixed_phase
+cirrus_fit_wo_mixed_phase
+```
+
+Additionally, I plot the MCMC trace for all four chains to check for visual convergence.
+![The MCMC trace for the cirrus model that includes mixed phase clouds.](mcmc_trace_w_mixed_phase.png)
+The chains are fairly well mixed, but not superb. Similarly, they appear to be mostly stationary. However, since the Rhat and neff values are within acceptable limits we choose to proceed.
 
 #### Posterior
 You may include any graphs or summary statistics of your choice that you think are useful in understanding the posterior.
+I present the posteriors for the effective radius intercept and "correction" parameters. Because of the link function, the values are the natural log of the actual effective radius. 
 
-#### Diagnostics for Fit Convergence 	
-This is only possible if your model was fitted using MCMC rather than quap()
+![The effective radius intercept posterior. This should represent the global average of cirrus cloud droplet effective radius.](reff_intercept.png)
+![The effective radius "no ice" correction posterior. This should represent the global average of cirrus cloud droplet effective radius.](reff_no-ice.png)
+![The effective radius "some ice" correction posterior. This should represent the global average of cirrus cloud droplet effective radius.](reff_some-ice.png)
+![The effective radius "all ice" correction posterior. This should represent the global average of cirrus cloud droplet effective radius.](reff_all-ice.png)
+
+There are two trends that I did not expect in these posteriors. First, I did not expect the intercept to be as small as it is. When exponentiated, the mode of this distribution comes out to ~0.045 $\mu m$ which is much smaller than what I expected and what I saw in the March 30th dataset. While this could be an error in the stan fitting code, I could not find it in the time needed for this project. The second trend is seen in the difference of the correction parameters:
+
+![The difference between the ln(effective radii) in "some ice" and "no ice" clouds. A natural log difference of -0.35 on this scale corresponds to a difference of ~0.7 $\mu m$. The posteriors above suggest that the negative value of the difference implies that the "no ice" populations tend to have droplets with larger effective radii than cirrus clouds of mixed phase.](reff_diff_some-no.png) 
+![The difference between the ln(effective radii) in "some ice" and "no ice" clouds. A natural log difference of -0.375 on this scale corresponds to a difference of ~0.68 $\mu m$. The posteriors above suggest that the negative value of the difference implies that the "some ice" populations tend to have droplets with larger effective radii than cirrus clouds in the solid phase.](reff_diff_all-some.png) 
+![The difference between the ln(effective radii) in "all ice" and "no ice" clouds. A natural log difference of -0.725 on this scale corresponds to a difference of ~0.48 $\mu m$. The posteriors above suggest that the negative value of the difference implies that the "no ice" populations tend to have droplets with larger effective radii than cirrus clouds of solid phase.](reff_diff_all-no.png) 
+These results seem to indicate the opposite relationship between "all ice" cirrus clouds and "no ice" cirrus clouds than I expected. The droplets in "all ice" clouds are smaller on average than the droplets in "no ice" clouds. However, the ongoing issue with the value of the intercept might also be linked to the values of these corrections. If so, the corrections, like the intercept, should be viewed with great skepticism.
+
+I want to make a posterior predictive distribution using the mu[i] values that were calculated in stan, but I am not sure how to do this. Any pointers would be greatly appreciated.
 
 #### Model Comparison
-Completing this step may require fitting additional models that include some subset of your full set of predictors.
+Another model was fit with where the mixed phase clouds were divided between the "no ice" and "all ice" populations. This is a test to probe whether modeling the mixed phase clouds can be done with a simpler model since the mixed phase clouds are not common. In data prep, the `cf_ice` number was divided at 0.5; all observations with `cf_ice < 0.5` went to "no ice" and the remainder went to "all ice". A modification to the stan code was made to reflect the elimination of a prior, but no other features were changed. The model was analyzed for convergence as above and was found to be convergent. I use the WAIC function from the `Rethinking` package by Richard McElreath to compare the two models. The results are shown below.
 
-### Discussion/Answer to Research Question 
-Provide a clear answer to your question of interest, referring to evidence presented earlier.
+```{R}
+compare(cirrus_fit_w_mixed_phase, cirrus_fit_wo_mixed_phase, func=WAIC)
+```
+
+It is clear from the WAIC scores that the cirrus model that accounts for the mixed phase is significantly better at describing the data than the model that does not account for the mixed phase.
+
+### Conclusion
+According to the analysis done here, it appears that cirrus clouds made entirely of ice are composed of droplet with smaller effective radii than the global average, and cirrus clouds made entirely of water are composed of droplets with larger effective radii than the global average. This is a direct reversal of my hypothesis. However, prior knowledge of droplet size distributions for cirrus clouds suggests that the global average droplet effective radius (reported here as the $\beta_0$ parameter) is much greater than the value found in my analysis by about a factor of 1000. It is possible that there is a unit issue with effective radii being reported in mm instead of $\mu$m, and this should be looked into as the reported unit from the PACE database is "microns" (equivalently, $\mu$m).
 
 ### Data Availability
-All data is available upon request through GitHub. Data and files used here can be found at https://github.com/carr-levi-a/calvinbayes25_atmsci.
+All my files are available upon request through GitHub. Files can be found at https://github.com/carr-levi-a/calvinbayes25_atmsci.
+
+I used data from the NASA PACE mission accessed through https://oceandata.sci.gsfc.nasa.gov/directdataaccess/. In particular, I use Level 3 Mapped data product from the OCI instrument with a resolution of 0.1 deg or ~11 km. The dates were March 30th, 2025, and April 2nd, 2025. The names of these files are "PACE_OCI.20250330.L3m.DAY.CLOUD.V3_0.1deg.NRT.nc" and "PACE_OCI.20250402.L3m.DAY.CLOUD.V3_0.1deg.NRT.nc", respectively.
 
 ### References:
 Hansen, J.E., Travis, L.D. Light scattering in planetary atmospheres. Space Sci Rev 16, 527–610 (1974). https://doi.org/10.1007/BF00168069
