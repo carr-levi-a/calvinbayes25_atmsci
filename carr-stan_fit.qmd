@@ -46,7 +46,6 @@ cer_16 <- ncvar_get(data, "cer_16")
 ```
 
 ```{R Format Data}
-
 cloud_data <- data.frame(
   lat = as.vector(lat_matrix),
   lon = as.vector(lon_matrix),
@@ -60,9 +59,26 @@ cloud_data <- data.frame(
    filter(cot < 3.1, ctt > 233.15) |> 
    # Select cirrus range. Rationale: https://journals.ametsoc.org/view/journals/amsm/58/1/amsmonographs-d-16-0010.1.pdf (pg 3)
    mutate( ice_idx = ifelse(cf_ice < 0.05, 1, ifelse(cf_ice < 0.95, 2, 3)) ) 
-   # No ice: 0, Some ice: 1, All ice: 2
+   # No ice: 1, Some ice: 2, All ice: 3
 
 ```
+```{r Format Data for 2nd test}
+cloud_data2 <- data.frame(
+  lat = as.vector(lat_matrix),
+  lon = as.vector(lon_matrix),
+  alb = as.vector(cth_alb),
+  cf_ice = as.vector(cf_ice),
+  cot = as.vector(cot),
+  ctt = as.vector(ctt),
+  r_eff = as.vector(cer_16)
+  )|>
+   drop_na(cf_ice, cot, ctt, r_eff) |>   # optional, there are a lot of NAs
+   filter(cot < 3.1, ctt > 233.15) |> 
+   # Select cirrus range. Rationale: https://journals.ametsoc.org/view/journals/amsm/58/1/amsmonographs-d-16-0010.1.pdf (pg 3)
+   mutate( ice_idx = ifelse(cf_ice < 0.5, 1, 2) )
+   # No ice: 1, All ice: 2
+```
+
 
 ```{r Declare Model}
 stan_cirrus_reff <- '
@@ -108,31 +124,88 @@ generated quantities {
 }
 '
 ```
+```{r Declare Model w/o mixed phase}
+stan_cirrus_reff2 <- '
+data {
+  int<lower=1> n;     // number of observations
+  vector<lower=0>[n] r_eff;    // response
+  array[n] int ice_idx; // predictor
+}
 
+parameters {
+  real<lower=0> sigma;  // gamma likelihood sd
+  real b0;               // intercept
+  vector[2] b1;         // parameters for cloud phase (NO mixed phase)
+}
+
+model {
+  vector[n] mu;
+  vector[n] alpha;
+  vector[n] lambda;
+  for ( i in 1:n ) {
+    mu[i] = exp(b0 + b1[ice_idx[i]]); // log link function
+    alpha[i] = mu[i] / sigma^2; // diff from DR gamma example
+    lambda[i] = mu[i]^2 / sigma^2;
+  }
+  b0 ~ normal(log(20), log(exp(1)));
+  b1[1] ~ normal(-0.1, 0.2);
+  b1[2] ~ normal(0.1, 0.2);
+  sigma ~ lognormal(log(15), 0.5);
+  r_eff ~ gamma(alpha, lambda);
+} 
+generated quantities {
+  vector[n] mu;
+  vector[n] alpha;
+  vector[n] lambda;
+  vector[n] log_lik;
+  for (i in 1:n) {
+    mu[i] = exp(b0 + b1[ice_idx[i]]);
+    alpha[i] = mu[i] / sigma^2; 
+    lambda[i] = mu[i]^2 / sigma^2;
+    log_lik[i] = gamma_lpdf(r_eff[i] | alpha[i], lambda[i]); 
+  } 
+}
+'
+```
 ```{r Transpose Data}
 stan_cirrus_data <- compose_data(cloud_data)
+stan_cirrus_data2 <- compose_data(cloud_data2)
 ```
 
 ```{r Model Fit}
 refit_model <- TRUE
-model_file <- "cirrus_fit_3.RDS"
+model_file <- "cirrus_fit_no_mixed_phase.RDS"
 
 if (refit_model){
-  cirrus_fit <- stan(model_code = stan_cirrus_reff,
-                  data = stan_cirrus_data,
-                  chains = 1, 
-                  iter = 200)
+  cirrus_fit <- stan(model_code = stan_cirrus_reff2,
+                  data = stan_cirrus_data2,
+                  chains = 4, 
+                  iter = 2000)
   saveRDS(cirrus_fit, file = model_file)
   
 }else{
-  cirrus_fit <- readRDS('cirrus_fit_2')
+  cirrus_fit <- readRDS(model_file)
 }
 
 ```
 
 ```{r Check Convergence}
 cirrus_fit
-mcmc_rank_overlay(cirrus_fit, pars=c('b0', 'b1[1]','b1[2]','b1[3]'))
+#mcmc_rank_overlay(cirrus_fit, pars=c('b0', 'b1[1]','b1[2]','b1[3]'))
 mcmc_trace(cirrus_fit, pars=c('b0', 'b1[1]','b1[2]','b1[3]'))
 ```
+
+```{r}
+cirrus_fit_w_mixed_phase <- as.data.frame(readRDS("cirrus_fit_3.RDS"))
+cirrus_fit_wo_mixed_phase <- as.data.frame(readRDS("cirrus_fit_no_mixed_phase.RDS"))
+```
+
+```{R}
+compare(cirrus_fit_w_mixed_phase, cirrus_fit_wo_mixed_phase, func=WAIC)
+```
+```{r}
+cirrus_fit_w_mixed_phase <- cirrus_fit_w_mixed_phase |> filter(b0, `b1[1]`, `b1[2]`, `b1[3]`)
+cirrus_fit_wo_mixed_phase <- cirrus_fit_wo_mixed_phase |> filter(b0, `b1[1]`, `b1[2]`)
+```
+
 
