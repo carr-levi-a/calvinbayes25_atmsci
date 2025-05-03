@@ -80,7 +80,9 @@ rte <- gp[2]
 gf_dist(dist="gamma", params=c(shpe, rte))
 ```
 ```{r Visualize Ideal DSD SD}
-gf_dist('lnorm', params=c(meanlog = log(15), sdlog = 0.5))
+mu <- 20
+sigma <- 15
+gf_dist('gamma', params=c(shape = mu/sigma^2, rate = mu^2/sigma^2))
 ```
 
 ```{r Prior Predictive Sim}
