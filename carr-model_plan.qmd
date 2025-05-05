@@ -42,6 +42,7 @@ Temperature [selected,pos="-1.631,0.183"]
 "Cloud Phase" -> "Optical Thickness"
 "Effective Radius" -> "Optical Thickness"
 "Nucleus Material" -> "Cloud Phase"
+"Nucleus Material" -> "Effective Radius"
 Temperature -> "Cloud Phase"
 }'
 )
