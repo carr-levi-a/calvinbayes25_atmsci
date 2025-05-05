@@ -27,6 +27,30 @@ causal_diag <- dagitty('dag {
 
 ggdag(causal_diag)
 ```
+
+
+```{r, include=FALSE}
+dagagram <- dagitty('dag {
+"Cloud Depth" [pos="-0.424,-0.199"]
+"Cloud Phase" [exposure,pos="-1.177,0.588"]
+"Effective Radius" [outcome,pos="-0.642,1.091"]
+"Nucleus Material" [latent,pos="-1.544,1.019"]
+"Optical Thickness" [pos="-0.476,0.318"]
+Temperature [selected,pos="-1.631,0.183"]
+"Cloud Depth" -> "Optical Thickness"
+"Cloud Phase" -> "Effective Radius"
+"Cloud Phase" -> "Optical Thickness"
+"Effective Radius" -> "Optical Thickness"
+"Nucleus Material" -> "Cloud Phase"
+Temperature -> "Cloud Phase"
+}'
+)
+```
+```{r}
+ggdag_classic(dagagram, size=5) + theme_dag_blank()
+```
+
+
 ## Initial Model & Priors
  $$
  R_{eff} \sim \mathrm{Gamma}(\mu_i, \sigma)
