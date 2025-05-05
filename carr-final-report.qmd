@@ -1,17 +1,16 @@
 ---
 title: "STAT 341 Final Report"
-author: "Levi carr"
+author: "Levi Carr"
 format: pdf
 ---
-```{r, include=FALSE}
+
+```{r Setup, include=FALSE}
+library(rethinking)
 cirrus_fit_w_mixed_phase <- readRDS("cirrus_fit_3.RDS")
 cirrus_fit_wo_mixed_phase <- readRDS("cirrus_fit_no_mixed_phase.RDS")
 ```
 ### Research Question
 In cirrus clouds, how does the effective radius of the droplets change with ice composition? 
-
-### Causal Diagram
-Draw it, and interpret it to determine which predictors are in and out of your model! May be drawn in R using dagitty(), or in other software if moderators are included
 
 ### The PACE Mission and the Cloud Dataset
 #### Mission Overview
@@ -26,6 +25,13 @@ From the cloud data products we also have variables such as the optical thicknes
 I have a post processing variable from the data set called `cf_ice` which describes how much of the cloud is ice. `cf_ice` ranges from 0 to 1 where 0 is an all liquid water cloud and 1 is an all ice cloud. By looking at the distribution of `cf_ice` on other days, a pattern of two high density peaks around 0 and 1 with a few cases in between is predominant. I therefore separate the data into three groups: "no ice" (0.05 > `cf_ice`), "some ice" (0.05 < `cf_ice` < 0.95), and "all ice" (`cf_ice` > 0.95).
 
 ### Model Description 
+My model will synthesize the cloud phase and effective radii (sampled at the 1.6 $\mu$m band) in particular to determine how cloud phase and effective radii interact. 
+
+#### Causal Diagram
+![A causal diagram for the interaction of cloud phase and effective radius, to the best of my knowledge.](dag.png)
+From the dataset, we are given temperature, effective radius, optical thickness, and cloud phase. Note that optical thickness is a collider, and so I do not use it in my model. However, as noted above, cirrus clouds as a population are known to reside within a certain range of optical thicknesses, so I only use it as a population selector. This does imply, however, that there is a priori knowledge of the effective radius, though implicitly so. As evidenced by the histogram of effective radii for the "training" data, there appears to be an upper limit on the effective radius occurring around 60 $\mu$m, even though we have no a priori knowledge of this limit. Likewise, temperature is used as a population selector based on the theoretical physics and nothing more. Cloud depth is the vertical thickness of the cloud. Nucleus material is the atomic/molecular composition of the droplet nucleus that formed the droplet. Different nuclei will lead to larger droplets and/or droplets that freeze faster, so this is a confounding variable in my model.
+
+#### Mathematical Description
  $$
  R_{eff} \sim \mathrm{Gamma}(\mu_i, \sigma)
  $$
@@ -100,18 +106,16 @@ As seen from the prior predictive distribution(s), the three populations are nea
 ![Boxplots of the first 20 simulated values of $mu$ with respect to ice content. No ice is seen on the left, some ice in the center, and all ice on the right of each pane.](prior_pred3.png)
 
 
-### Model 
+### Fitted Model 
 This model was fit by the MCMC package cmdstan. Four chains were computed with 2000 total iterations each using `adapt_delta = 0.8`
 
 #### Diagnostics for Fit Convergence 	
 I analyzed two fits of convergence readily available in stan: neff and Rhat. This model uses 1000 sampling iterations. The neff for the parameters associated with the categorical predictors is ~500 for all, indicating that the sampling process was mildly inefficient. Rhat for all parameters associated with the predictors was 1.00. 
-```{r}
-cirrus_fit_w_mixed_phase
-cirrus_fit_wo_mixed_phase
-```
+
+[I cannot place the model information here because of the simulated mu[i] values]
 
 Additionally, I plot the MCMC trace for all four chains to check for visual convergence.
-![The MCMC trace for the cirrus model that includes mixed phase clouds.](mcmc_trace_w_mixed_phase.png)
+![The MCMC trace for the cirrus model that includes mixed phase clouds.](mcmc_trace_w_mixed_phase.png) 
 The chains are fairly well mixed, but not superb. Similarly, they appear to be mostly stationary. However, since the Rhat and neff values are within acceptable limits we choose to proceed.
 
 #### Posterior
@@ -135,7 +139,7 @@ I want to make a posterior predictive distribution using the mu[i] values that w
 #### Model Comparison
 Another model was fit with where the mixed phase clouds were divided between the "no ice" and "all ice" populations. This is a test to probe whether modeling the mixed phase clouds can be done with a simpler model since the mixed phase clouds are not common. In data prep, the `cf_ice` number was divided at 0.5; all observations with `cf_ice < 0.5` went to "no ice" and the remainder went to "all ice". A modification to the stan code was made to reflect the elimination of a prior, but no other features were changed. The model was analyzed for convergence as above and was found to be convergent. I use the WAIC function from the `Rethinking` package by Richard McElreath to compare the two models. The results are shown below.
 
-```{R}
+```{R Compare Models}
 compare(cirrus_fit_w_mixed_phase, cirrus_fit_wo_mixed_phase, func=WAIC)
 ```
 
