@@ -190,7 +190,7 @@ if (refit_model){
 ```
 
 ```{r Check Convergence}
-cirrus_fit
+#cirrus_fit <- readRDS("cirrus_fit_3.RDS")
 #mcmc_rank_overlay(cirrus_fit, pars=c('b0', 'b1[1]','b1[2]','b1[3]'))
 mcmc_trace(cirrus_fit, pars=c('b0', 'b1[1]','b1[2]','b1[3]'))
 ```
