@@ -23,7 +23,7 @@ Read in the 0.1deg or about 10km resolution data (11.1 km?)
 
 ### Data Wrangling
 ```{r Read in Dataset from NetCDF file}
-data <- nc_open("PACE_OCI.20250330.L3m.DAY.CLOUD.V3_0.1deg.NRT.nc")
+data <- nc_open("PACE_OCI.20250402.L3m.DAY.CLOUD.V3_0.1deg.NRT.nc")
 ```
 
 Now extract variables we want:

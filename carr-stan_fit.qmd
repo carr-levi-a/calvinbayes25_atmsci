@@ -112,8 +112,8 @@ generated quantities {
   vector[n] log_lik;
   for (i in 1:n) {
     mu[i] = exp(b0 + b1[ice_idx[i]]);
-    alpha[i] = mu[i] / sigma^2; 
-    lambda[i] = mu[i]^2 / sigma^2;
+    alpha[i] = mu[i]^2 / sigma^2; 
+    lambda[i] = mu[i] / sigma^2;
     log_lik[i] = gamma_lpdf(r_eff[i] | alpha[i], lambda[i]); 
   } 
 }
@@ -139,8 +139,8 @@ model {
   vector[n] lambda;
   for ( i in 1:n ) {
     mu[i] = exp(b0 + b1[ice_idx[i]]); // log link function
-    alpha[i] = mu[i] / sigma^2; // diff from DR gamma example
-    lambda[i] = mu[i]^2 / sigma^2;
+    alpha[i] = mu[i]^2 / sigma^2; // diff from DR gamma example
+    lambda[i] = mu[i] / sigma^2;
   }
   b0 ~ normal(log(23), log(exp(5)));
   b1[1] ~ student_t(2, -0.04445, 1);
@@ -155,8 +155,8 @@ generated quantities {
   vector[n] log_lik;
   for (i in 1:n) {
     mu[i] = exp(b0 + b1[ice_idx[i]]);
-    alpha[i] = mu[i] / sigma^2; 
-    lambda[i] = mu[i]^2 / sigma^2;
+    alpha[i] = mu[i]^2 / sigma^2; 
+    lambda[i] = mu[i] / sigma^2;
     log_lik[i] = gamma_lpdf(r_eff[i] | alpha[i], lambda[i]); 
   } 
 }
