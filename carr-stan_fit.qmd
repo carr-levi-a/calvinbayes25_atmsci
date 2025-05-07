@@ -99,9 +99,9 @@ model {
     lambda[i] = mu[i]^2 / sigma^2;
   }
   b0 ~ normal(log(23), log(exp(5)));
-  b1[1] ~ normal(-0.04445, 0.2);
-  b1[2] ~ normal(0.0000, 0.4);
-  b1[3] ~ normal(0.04256, 0.2);
+  b1[1] ~ student_t(2, -0.04445, 1);
+  b1[2] ~ student_t(2, 0.0000, 2);
+  b1[3] ~ student_t(2, 0.04256, 1);
   sigma ~ lognormal(log(8), 0.5);
   r_eff ~ gamma(alpha, lambda);
 } 
@@ -143,8 +143,8 @@ model {
     lambda[i] = mu[i]^2 / sigma^2;
   }
   b0 ~ normal(log(23), log(exp(5)));
-  b1[1] ~ normal(-0.04445, 0.2);
-  b1[2] ~ normal(0.04256, 0.2);
+  b1[1] ~ student_t(2, -0.04445, 1);
+  b1[2] ~ student_t(2, 0.04256, 1);
   sigma ~ lognormal(log(8), 0.5);
   r_eff ~ gamma(alpha, lambda);
 } 
@@ -169,11 +169,11 @@ stan_cirrus_data2 <- compose_data(cloud_data2)
 
 ```{r Model Fit}
 refit_model <- TRUE
-model_file <- "cirrus_fit_mixed_phase.RDS"
+model_file <- "cirrus_fit_wo_mixed_phase.RDS"
 
 if (refit_model){
-  cirrus_fit <- stan(model_code = stan_cirrus_reff,
-                  data = stan_cirrus_data,
+  cirrus_fit <- stan(model_code = stan_cirrus_reff2,
+                  data = stan_cirrus_data2,
                   chains = 4, 
                   iter = 2000)
   saveRDS(cirrus_fit, file = model_file)
@@ -185,10 +185,10 @@ if (refit_model){
 ```
 
 ```{r Check Convergence}
-summary(cirrus_fit, pars=c('b0', 'b1[1]','b1[2]','b1[3]'))
+summary(cirrus_fit, pars=c('b0', 'b1[1]','b1[2]', 'b1[3]'))$summary
 #cirrus_fit <- readRDS("cirrus_fit_3.RDS")
 #mcmc_rank_overlay(cirrus_fit, pars=c('b0', 'b1[1]','b1[2]','b1[3]'))
-#mcmc_trace(cirrus_fit, pars=c('b0', 'b1[1]','b1[2]','b1[3]'))
+mcmc_trace(cirrus_fit, pars=c('b0', 'b1[1]','b1[2]','b1[3]'))
 ```
 
 ```{r}

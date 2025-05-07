@@ -19,7 +19,7 @@ theme_set(theme_classic(base_size=16))
 
 ```{r Read In RDS File}
 #cirrus_fit <- readRDS('cirrus_fit_2')
-cirrus_fit <- cirrus_fit_w_mixed_phase
+#cirrus_fit <- cirrus_fit_w_mixed_phase
 cirrus_fit_samps <- as.data.frame(cirrus_fit) |> rename(Mean_Reff = b0,
                                                         No_Ice = `b1[1]`,
                                                         Some_Ice = `b1[2]`,
@@ -28,7 +28,6 @@ cirrus_fit_samps <- as.data.frame(cirrus_fit) |> rename(Mean_Reff = b0,
 ```
 
 ```{r Check Convergence}
-cirrus_fit
 mcmc_rank_overlay(cirrus_fit, pars=c('b0', 'b1[1]','b1[2]','b1[3]'))
 mcmc_trace(cirrus_fit, pars=c('b0', 'b1[1]','b1[2]','b1[3]'))
 ```

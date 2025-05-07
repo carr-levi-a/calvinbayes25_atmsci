@@ -91,13 +91,13 @@ n_sim <- 50 # number of simulated datasets
 
 prior_pred_dist <- tibble(sim_id = c(1:n_sim)) |> 
    mutate(b0 = rnorm(n_sim, log(23), log(5)),
-          b1_0 = rstudent(n_sim, nu=2, mu=log(19/20), sigma=0.2), 
+          b1_0 = rstudent(n_sim, 2, log(22/23), 1), 
           # I expect the effective radius to decrease from average for 
           # (supercooled) non precipitating liquid clouds 
-          b1_1 = rstudent(n_sim, nu=2, mu=log(1), sigma=0.4),
+          b1_1 = rstudent(n_sim, 2, log(1), 2),
           # I expect the effective radius to stay around average for 
           # intermediate liquid/ice states. I expect a larger variance here
-          b1_2 = rstudent(n_sim, nu=2, mu=log(21/20), sigma=0.2), 
+          b1_2 = rstudent(n_sim, 2, log(24/23), 1), 
           # I expect the effective radius to increase for ice clouds. 
           # Ice crystals tend to be bigger in non precipitating clouds
           sigma = rlnorm(n_sim, log(8), 0.5)
