@@ -36,11 +36,8 @@ lon_matrix <- matrix(lon, nrow = length(lon), ncol = length(lat), byrow = FALSE)
 
 # repeat code like this for all variables you want
 cf <- ncvar_get(data, "cloud_fraction")
-cth_alb <- ncvar_get(data, "cth_alb")
 cf_ice <- ncvar_get(data, "ice_cloud_fraction")
-ctp <- ncvar_get(data, "ctp")
-cot <- ncvar_get(data,
-                 "cth_cot")
+cot <- ncvar_get(data, "cth_cot")
 ctt <- ncvar_get(data, "ctt")
 cer_16 <- ncvar_get(data, "cer_16")
 ```
@@ -49,7 +46,6 @@ cer_16 <- ncvar_get(data, "cer_16")
 cloud_data <- data.frame(
   lat = as.vector(lat_matrix),
   lon = as.vector(lon_matrix),
-  alb = as.vector(cth_alb),
   cf_ice = as.vector(cf_ice),
   cot = as.vector(cot),
   ctt = as.vector(ctt),
@@ -66,7 +62,6 @@ cloud_data <- data.frame(
 cloud_data2 <- data.frame(
   lat = as.vector(lat_matrix),
   lon = as.vector(lon_matrix),
-  alb = as.vector(cth_alb),
   cf_ice = as.vector(cf_ice),
   cot = as.vector(cot),
   ctt = as.vector(ctt),
@@ -103,11 +98,11 @@ model {
     alpha[i] = mu[i] / sigma^2; // diff from DR gamma example
     lambda[i] = mu[i]^2 / sigma^2;
   }
-  b0 ~ normal(log(20), log(exp(1)));
-  b1[1] ~ normal(-0.1, 0.2);
-  b1[2] ~ normal(0.005, 0.4);
-  b1[3] ~ normal(0.1, 0.2);
-  sigma ~ lognormal(log(15), 0.5);
+  b0 ~ normal(log(23), log(exp(5)));
+  b1[1] ~ normal(-0.04445, 0.2);
+  b1[2] ~ normal(0.0000, 0.4);
+  b1[3] ~ normal(0.04256, 0.2);
+  sigma ~ lognormal(log(8), 0.5);
   r_eff ~ gamma(alpha, lambda);
 } 
 generated quantities {
@@ -147,10 +142,10 @@ model {
     alpha[i] = mu[i] / sigma^2; // diff from DR gamma example
     lambda[i] = mu[i]^2 / sigma^2;
   }
-  b0 ~ normal(log(20), log(exp(1)));
-  b1[1] ~ normal(-0.1, 0.2);
-  b1[2] ~ normal(0.1, 0.2);
-  sigma ~ lognormal(log(15), 0.5);
+  b0 ~ normal(log(23), log(exp(5)));
+  b1[1] ~ normal(-0.04445, 0.2);
+  b1[2] ~ normal(0.04256, 0.2);
+  sigma ~ lognormal(log(8), 0.5);
   r_eff ~ gamma(alpha, lambda);
 } 
 generated quantities {
@@ -174,11 +169,11 @@ stan_cirrus_data2 <- compose_data(cloud_data2)
 
 ```{r Model Fit}
 refit_model <- TRUE
-model_file <- "cirrus_fit_no_mixed_phase.RDS"
+model_file <- "cirrus_fit_mixed_phase.RDS"
 
 if (refit_model){
-  cirrus_fit <- stan(model_code = stan_cirrus_reff2,
-                  data = stan_cirrus_data2,
+  cirrus_fit <- stan(model_code = stan_cirrus_reff,
+                  data = stan_cirrus_data,
                   chains = 4, 
                   iter = 2000)
   saveRDS(cirrus_fit, file = model_file)
@@ -190,9 +185,10 @@ if (refit_model){
 ```
 
 ```{r Check Convergence}
+summary(cirrus_fit, pars=c('b0', 'b1[1]','b1[2]','b1[3]'))
 #cirrus_fit <- readRDS("cirrus_fit_3.RDS")
 #mcmc_rank_overlay(cirrus_fit, pars=c('b0', 'b1[1]','b1[2]','b1[3]'))
-mcmc_trace(cirrus_fit, pars=c('b0', 'b1[1]','b1[2]','b1[3]'))
+#mcmc_trace(cirrus_fit, pars=c('b0', 'b1[1]','b1[2]','b1[3]'))
 ```
 
 ```{r}
