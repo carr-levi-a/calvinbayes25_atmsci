@@ -6,6 +6,7 @@ format: pdf
 
 ```{r Setup, include=FALSE}
 library(rethinking)
+library(bayesplot)
 cirrus_fit_w_mixed_phase <- readRDS("cirrus_fit_3.RDS")
 cirrus_fit_wo_mixed_phase <- readRDS("cirrus_fit_no_mixed_phase.RDS")
 ```
@@ -42,12 +43,12 @@ The effective radius ($R_eff$) of droplets in clouds has been identified in the 
  $$
  Since $\ln{\mu}$ is a linear relationship, we can say that $R_{eff}$ is a GLM. Since $R_{eff}$ is modeled as a gamma GLM, we use a logarithmic link function to assure that all inputs to the likelihood distribution are strictly positive. In particular, $\ln(\mu)$ is a function of $\beta_0$ and $\beta_1 \left[ \text{ice fraction} \right]$. $\beta_0$ is as the global average $R_{eff}$ for all cloud types. $\beta_1$ is a 3-vector with one component for each cirrus subset (no ice, some ice, and all ice). The components of $\beta_1$ are then the corrections from the global average $R_{eff}$ value for each phase type. 
  $$
- \beta_0 \sim \mathrm{Normal}(\ln(20), \ln(e))
+ \beta_0 \sim \mathrm{Normal}(\ln(23), \ln(5))
  $$
  
 It is very hard to track down the size of liquid water in cirrus clouds, so I hypothesize that the radius of liquid water droplets are smaller in clouds to the merit that liquid water expands when it freezes, often into shapes that are not minimal surfaces; this is to say that ice's effective radius should be larger. Since $\beta_0$ is the global average which includes the ice clouds, my hypothesis suggests that the radii are smaller than the average effective radius of cirrus clouds.
 
-Assume that the hypothesis is true and that all ice and no ice clouds are found in equal proportions across the globe. It should be the case then that the global average is the average of the means of the all ice and no ice cloud droplet distributions. Since water expands by ~10%, the mean effective radius for no ice clouds should be smaller than the global average by ~5% or ~1$\mu m$. Likewise, the mean effective radius for all ice clouds should be ~5% larger than the global average, or ~1$\mu m$. How do we get this to work with the link function? Start by writing
+Assume that the hypothesis is true and that all ice and no ice clouds are found in equal proportions across the globe. It should be the case then that the global average is the average of the means of the all ice and no ice cloud droplet distributions. Since water expands by ~10%, the mean effective radius for no ice clouds should be smaller than the global average by ~5% or ~1$\mu$m. Likewise, the mean effective radius for all ice clouds should be ~5% larger than the global average, or ~1$\mu$m. How do we get this to work with the link function? Start by writing
 
 $$
 \ln(\vec{\mu_j}) = \vec{\beta}_0 + \vec{\beta}_{1,j}
@@ -57,68 +58,152 @@ where $j = 1,2,3$ are the no ice, some ice, and all ice populations, respectivel
 $$
 \vec{\mu_j} = e^{\vec{\beta}_0 + \vec{\beta}_{1,j}} = e^{\vec{\beta}_0} e^{\vec{\beta}_{1,j}} = e^{\vec{\beta}_0} \left[ e^{\beta_{1,1}}, e^{\beta_{1,2}}, e^{\beta_{1,3}} \right]^\top
 $$
-But $e^{\vec{\beta}_0}$ is just the global average $R_{eff}$ and $\vec{\mu}$ is a vector of our expected values for each phase of matter. So $e^{\vec{\beta}_0} = [20, 20, 20]^\top$, $\mu = [19, 20, 21]$, and  
+But $e^{\vec{\beta}_0}$ is just the global average $R_{eff}$ and $\vec{\mu}$ is a vector of our expected values for each phase of matter. So $e^{\vec{\beta}_0} = [23, 23, 23]^\top$, $\mu = [22, 23, 24]$, and  
 
 $$
-\vec{\mu}\cdot e^{-\vec{\beta}_0} = \frac{1}{20}[19, 20, 21]^\top = \left[ e^{\beta_{1,1}}, e^{\beta_{1,2}}, e^{\beta_{1,3}} \right]^\top = e^{\vec{\beta}_{1,j}}
+\vec{\mu}\cdot e^{-\vec{\beta}_0} = \frac{1}{23}[22, 23, 24]^\top = \left[ e^{\beta_{1,1}}, e^{\beta_{1,2}}, e^{\beta_{1,3}} \right]^\top = e^{\vec{\beta}_{1,j}}
 $$
 therefore, the prior means, $\vec{\beta}_{1,j}$, are
 
 $$
-\vec{\beta}_{1,j} = \ln{\left( \frac{1}{20}[19, 20, 21]^\top \right)} = [-0.05129, 0.0, 0.04879]^\top
+\vec{\beta}_{1,j} = \ln{\left( \frac{1}{23}[22, 23, 24]^\top \right)} = [-0.04445,  0.00000,  0.04256]^\top
 $$
 
 As a result, I suppose
 
 $$
- \beta_1[\text{no ice}] \sim \mathrm{Student}(\nu = 2, \;\text{mean}= -0.05129, \;\text{sigma}= -0.1)
+ \beta_1[\text{no ice}] \sim \mathrm{Student}(\nu = 2, \;\text{mean}= -0.04445, \;\text{sigma}= 0.2)
 $$
-I could not track down a value for the variance of the liquid phase's effective radius, but I expect it to be fairly exact since it is based on a physical basis. I chose a (natural log) standard deviation of -0.1 (standard deviation 0.9048 $\mu m$). Even so, I regularize the prior with a student t-distribution so that the data may still drive the posterior.
+I could not track down a value for the variance of the liquid phase's effective radius, but I expect it to be fairly exact since it is based on a physical basis. I chose a standard deviation of 0.2 $\mu$m. Even so, I regularize the prior with a student t-distribution so that the data may still drive the posterior.
  
  $$
- \beta_1[\text{some ice}] \sim \mathrm{Student}(\nu = 2, \;\text{mean}= 0.00000, \;\text{sigma}= 0.2)
+ \beta_1[\text{some ice}] \sim \mathrm{Student}(\nu = 2, \;\text{mean}= 0.00000, \;\text{sigma}= 0.4)
  $$
  
- There are a small number of mixed-phase cirrus clouds, but they range from 5-95% ice by my artificial distinction. I expect the average radii of droplets in these clouds to be close to the global average, but with a larger variation than their ice and liquid counterparts given the wide range of possible phase concentrations. A standard deviation of 0.4 was chosen via the prior predictive distribution.
+ There are a small number of mixed-phase cirrus clouds, but they range from 5-95% ice by my artificial distinction. I expect the average radii of droplets in these clouds to be close to the global average, but with a larger variation than their ice and liquid counterparts given the wide range of possible phase concentrations. A standard deviation of 0.4 $\mu$m was chosen via the prior predictive distribution.
  
  $$
- \beta_1[\text{all ice}] \sim \mathrm{Student}(\nu = 2, \;\text{mean}= -0.04879, \;\text{sigma}= -0.1)
+ \beta_1[\text{all ice}] \sim \mathrm{Student}(\nu = 2, \;\text{mean}= 0.04256, \;\text{sigma}= 0.2)
  $$
- By my hypothesis, the freezing of liquid water droplets should yield larger effective radii, so the correction to the average should be positive. Like the liquid droplet case, I could not find much for variance information, but I still expect it to be fairly constrained since the cloud is composed only of one phase of matter. I chose a (natural log) standard deviation of -0.1 (standard deviation 0.9048 $\mu m$). Even so, I regularize the prior with a student t-distribution so that the data may still drive the posterior.
+ By my hypothesis, the freezing of liquid water droplets should yield larger effective radii, so the correction to the average should be positive. Like the liquid droplet case, I could not find much for variance information, but I still expect it to be fairly constrained since the cloud is composed only of one phase of matter. I chose a standard deviation of 0.2 $\mu$m. Even so, I regularize the prior with a student t-distribution so that the data may still drive the posterior.
  
  
- By analyzing one day of data, I found that most effective radii were above 10 $\mu m$. Therefore, I adopt a lognormal distribution (strictly positive outputs, faster probability drop than an exponential) to describe the standard deviation in effective radius. Knowing that many of the $R_{eff}$ distributions have an effective lower bound at 10 and an effective upper bound ~80, I chose to adopt the following as my standard deviation:
+ By analyzing one day of data, I found that most effective radii were above 10 $\mu$m. Therefore, I adopt a lognormal distribution (strictly positive outputs, faster probability drop than an exponential) to describe the standard deviation in effective radius. Knowing that many of the $R_{eff}$ distributions have an effective lower bound at 10 $\mu$m and an effective upper bound ~80$\mu$m , I chose to adopt the following as my standard deviation:
  $$
- \sigma \sim \mathrm{Lognormal}(\ln(15), 0.5)
+ \sigma \sim \mathrm{Lognormal}(\ln(8), 0.5)
  $$
  
 
 ### Prior Predictive Distribution
 Using the prior information above, I construct a prior predictive distribution for the effective radii in each population.
 
-![The prior predictive distribution for each population of clouds, grouped by phase of matter. No ice is on the left, some ice is in the center, all ice is on the right.](prior_pred1.png)
+```{r Grab Data}
+data <- nc_open("PACE_OCI.20250402.L3m.DAY.CLOUD.V3_0.1deg.NRT.nc")
 
-As seen from the prior predictive distribution(s), the three populations are nearly identical. Furthermore, there may be an unaccounted for effect driving many of the effective radii towards zero. I do not have the theoretical background to know what physical mechanism this might be. 
+# positions
+lat <- ncvar_get(data, "lat") # columns of data matrices
+lon <- ncvar_get(data, "lon") # rows of data matrices
+lat_matrix <- matrix(lat, nrow = length(lon), ncol = length(lat), byrow = TRUE)
+lon_matrix <- matrix(lon, nrow = length(lon), ncol = length(lat), byrow = FALSE)
 
-![The first 20 prior predictive distributions for effective radius. Note that the distributions not with mean ~ 0 follow the expected/observed distribution for real cirrus clouds.](prior_pred2.png)
+# repeat code like this for all variables you want
+cf_ice <- ncvar_get(data, "ice_cloud_fraction")
+cot <- ncvar_get(data, "cth_cot")
+ctt <- ncvar_get(data, "ctt")
+cer_16 <- ncvar_get(data, "cer_16")
+```
+```{R Format Data}
+cloud_data <- data.frame(
+  lat = as.vector(lat_matrix),
+  lon = as.vector(lon_matrix),
+  cf_ice = as.vector(cf_ice),
+  cot = as.vector(cot),
+  ctt = as.vector(ctt),
+  cer16 = as.vector(cer_16)
+  )|>
+   drop_na(cf_ice, cot, ctt, cer16) |>   # optional, there are a lot of NAs
+   filter(cot < 3.1, ctt > 233.15) |> 
+   # Select cirrus range. Rationale: https://journals.ametsoc.org/view/journals/amsm/58/1/amsmonographs-d-16-0010.1.pdf (pg 3)
+   mutate( ice_idx = ifelse(cf_ice < 0.05, 0, ifelse(cf_ice < 0.95, 1, 2)) ) 
+   # No ice: 0, Some ice: 1, All ice: 2
+```
+```{r Prior Predictive Sim}
+n_sim <- 50 # number of simulated datasets
 
-
-![Boxplots of the first 20 simulated values of $mu$ with respect to ice content. No ice is seen on the left, some ice in the center, and all ice on the right of each pane.](prior_pred3.png)
-
+prior_pred_dist <- tibble(sim_id = c(1:n_sim)) |> 
+   mutate(b0 = rnorm(n_sim, log(23), log(5)),
+          b1_0 = rstudent(n_sim, nu=2, mu=log(22/230), sigma=0.2), 
+          # I expect the effective radius to decrease from average for 
+          # (supercooled) non precipitating liquid clouds 
+          b1_1 = rstudent(n_sim, nu=2, mu=log(1), sigma=0.4),
+          # I expect the effective radius to stay around average for 
+          # intermediate liquid/ice states. I expect a larger variance here
+          b1_2 = rstudent(n_sim, nu=2, mu=log(24/23), sigma=0.2), 
+          # I expect the effective radius to increase for ice clouds. 
+          # Ice crystals tend to be bigger in non precipitating clouds
+          sigma = rlnorm(n_sim, log(8), 0.5)
+          ) |>
+   rowwise() |>
+   mutate(mu = list(exp( b0 +
+                         b1_0 * ifelse(cloud_data$ice_idx == 0, 1, 0) +
+                         b1_1 * ifelse(cloud_data$ice_idx == 1, 1, 0) +
+                         b1_2 * ifelse(cloud_data$ice_idx == 2, 1, 0) )),
+          ice_idx = list(cloud_data$ice_idx),
+          cf_ice = list(cloud_data$cf_ice),
+          ) |>
+   unnest(cols =  c(mu, ice_idx, cf_ice)) |>
+   ungroup() |>
+   mutate(alpha = mu / sigma^2,
+          lambda = mu^2 / sigma^2
+   ) |>
+   rowwise() |>
+   mutate( sim_Reff = rgamma(1, rate = alpha, shape = lambda) ) |>
+   ungroup()
+```
+```{r Show r_eff by phase}
+gf_dens(~sim_Reff | factor(ice_idx), group = ~sim_id, 
+        data = prior_pred_dist |> filter(sim_Reff > 0.1),
+         alpha = 0.6) |>
+   gf_lims(x = c(0,100))
+```
+The prior predictive distribution for each population of clouds, grouped by phase of matter. No ice is on the left, some ice is in the center, all ice is on the right. As seen from the prior predictive distribution(s), the three populations are nearly identical. Furthermore, there may be an unaccounted for effect driving many of the effective radii towards zero. I do not have the theoretical background to know what physical mechanism this might be.
+```{r Show R_eff sims}
+gf_dens(~sim_Reff, group = ~sim_id, 
+        data = prior_pred_dist |>
+           filter(sim_id <21)) |>
+   gf_facet_wrap(~sim_id, scales = 'free') |>
+   gf_lims( x = c(0,1E2))
+```
+The first 20 prior predictive distributions for effective radius. Note that the distributions not with mean ~ 0 follow the expected/observed distribution for real cirrus clouds.
+```{r}
+gf_boxplot(mu ~ factor(ice_idx) | sim_id,
+         alpha = 0.1,
+         data = prior_pred_dist |>
+          filter(sim_id < 21) ) |>
+   gf_lims( y = c(0, 50))
+```
+Boxplots of the first 20 simulated values of $mu$ with respect to ice content. No ice is seen on the left, some ice in the center, and all ice on the right of each pane
 
 ### Fitted Model 
 This model was fit by the MCMC package cmdstan. Four chains were computed with 2000 total iterations each using `adapt_delta = 0.8`
 
 #### Diagnostics for Fit Convergence 	
 I analyzed two fits of convergence readily available in stan: neff and Rhat. This model uses 1000 sampling iterations. The neff for the parameters associated with the categorical predictors is ~500 for all, indicating that the sampling process was mildly inefficient. Rhat for all parameters associated with the predictors was 1.00. 
-
-[I cannot place the model information here because of the simulated mu[i] values]
-
+```{r}
+summary(cirrus_fit_w_mixed_phase, pars = c("b0", "b1[1]", "b1[2]", "b1[3]", "sigma"))$summary
+summary(cirrus_fit_wo_mixed_phase, pars = c("b0", "b1[1]", "b1[2]", "sigma"))$summary
+```
 Additionally, I plot the MCMC trace for all four chains to check for visual convergence.
-![The MCMC trace for the cirrus model that includes mixed phase clouds.](mcmc_trace_w_mixed_phase.png) 
+```{r MCMC trace for model w/mixed phase}
+mcmc_trace(cirrus_fit_w_mixed_phase, pars = c("b0", "b1[1]", "b1[2]", "b1[3]", "sigma"))
+```
+The MCMC trace for the cirrus model that includes mixed phase clouds.
+```{r MCMC trace for model w/o mixed phase}
+mcmc_trace(cirrus_fit_wo_mixed_phase, pars = c("b0", "b1[1]", "b1[2]", "sigma"))
+```
 The chains are fairly well mixed, but not superb. Similarly, they appear to be mostly stationary. However, since the Rhat and neff values are within acceptable limits we choose to proceed.
 
-#### Posterior
+#### Posteriors
 You may include any graphs or summary statistics of your choice that you think are useful in understanding the posterior.
 I present the posteriors for the effective radius intercept and "correction" parameters. Because of the link function, the values are the natural log of the actual effective radius. 
 
@@ -134,6 +219,7 @@ There are two trends that I did not expect in these posteriors. First, I did not
 ![The difference between the ln(effective radii) in "all ice" and "no ice" clouds. A natural log difference of -0.725 on this scale corresponds to a difference of ~0.48 $\mu m$. The posteriors above suggest that the negative value of the difference implies that the "no ice" populations tend to have droplets with larger effective radii than cirrus clouds of solid phase.](reff_diff_all-no.png) 
 These results seem to indicate the opposite relationship between "all ice" cirrus clouds and "no ice" cirrus clouds than I expected. The droplets in "all ice" clouds are smaller on average than the droplets in "no ice" clouds. However, the ongoing issue with the value of the intercept might also be linked to the values of these corrections. If so, the corrections, like the intercept, should be viewed with great skepticism.
 
+#### Posterior Predictive Distribution for mu
 I want to make a posterior predictive distribution using the mu[i] values that were calculated in stan, but I am not sure how to do this. Any pointers would be greatly appreciated.
 
 #### Model Comparison
