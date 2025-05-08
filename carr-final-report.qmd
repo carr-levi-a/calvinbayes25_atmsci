@@ -7,7 +7,7 @@ format: pdf
 ```{r Setup, include=FALSE}
 library(rethinking)
 library(bayesplot)
-cirrus_fit_w_mixed_phase <- readRDS("cirrus_fit_3.RDS")
+cirrus_fit_w_mixed_phase <- readRDS("cirrus_fit_mixed_phase.RDS")
 cirrus_fit_wo_mixed_phase <- readRDS("cirrus_fit_no_mixed_phase.RDS")
 ```
 ### Research Question
@@ -15,7 +15,7 @@ In cirrus clouds, how does the effective radius of the droplets change with ice 
 
 ### The PACE Mission and the Cloud Dataset
 #### Mission Overview
-PACE (Plankton, Aerosol, Cloud, ocean Ecosystem) is a NASA science mission launched into on 08-Feb 2024 to extend and improve observations of global ocean biology, aerosols, and clouds. PACE has three science instruments aboard to examine the earth from above: the SPEXone polarimeter, the HARP2 polarimeter, and the Ocean Color Instrument (OCI). From NASA: "PACE's primary sensor, the Ocean Color Instrument (OCI), is a highly advanced optical spectrometer that measures properties of light over portions of the electromagnetic spectrum. It enables continuous measurement of light at finer wavelength resolution than previous NASA satellite sensors, extending key system ocean color data records for climate studies." This instrument yields atmospheric data products that I use for my analysis of cirrus cloud effective radii.
+PACE (Plankton, Aerosol, Cloud, ocean Ecosystem) is a NASA science mission launched into orbit on February 8th, 2024 to extend and improve observations of global ocean biology, aerosols, and clouds. PACE has three science instruments aboard to examine the earth from above: the SPEXone polarimeter, the HARP2 polarimeter, and the Ocean Color Instrument (OCI). From NASA: "PACE's primary sensor, the Ocean Color Instrument (OCI), is a highly advanced optical spectrometer that measures properties of light over portions of the electromagnetic spectrum. It enables continuous measurement of light at finer wavelength resolution than previous NASA satellite sensors, extending key system ocean color data records for climate studies." This instrument yields atmospheric data products that I use for my analysis of cirrus cloud effective radii.
 
 The satellite's orbital period is one solar day, so data is naturally binned by day. From the data, I selected a "training" day (where I looked directly at the data) and a "test" day which I fit the model to. These days were March 30th and April 2nd, respectively. The data files used are given in the "Data Availability" section.
 
@@ -23,10 +23,10 @@ The satellite's orbital period is one solar day, so data is naturally binned by 
 From the cloud data products we also have variables such as the optical thickness $\tau$ (a measure of transmission) and cloud top pressure $T_{top}$. Heymsfield et al. (2017) state that cirrus clouds are observed to have cloud top temperatures greater than $-40^{\circ}$ C and optical thicknesses less than 3.1. Thus, I select only values from the cloud data set for $T_{top} > 233.15$ K and $\tau <3.1$. 
 
 ### Making Categorical Predictors
-I have a post processing variable from the data set called `cf_ice` which describes how much of the cloud is ice. `cf_ice` ranges from 0 to 1 where 0 is an all liquid water cloud and 1 is an all ice cloud. By looking at the distribution of `cf_ice` on other days, a pattern of two high density peaks around 0 and 1 with a few cases in between is predominant. I therefore separate the data into three groups: "no ice" (0.05 > `cf_ice`), "some ice" (0.05 < `cf_ice` < 0.95), and "all ice" (`cf_ice` > 0.95).
+Included in the PACE atmospheric data set is the `cf_ice` variable which describes how much of the cloud is ice. `cf_ice` ranges from 0 to 1 where 0 is an all liquid water cloud and 1 is an all ice cloud. By examining the distribution of `cf_ice` on March 30th, 2025, a pattern of two high density peaks around 0 and 1 with a few cases in between is predominant. I therefore separate the data into three groups: "no ice" (0.05 > `cf_ice`), "some ice" (0.05 < `cf_ice` < 0.95), and "all ice" (`cf_ice` > 0.95).
 
 ### Model Description 
-My model will synthesize the cloud phase and effective radii (sampled at the 1.6 $\mu$m band) in particular to determine how cloud phase and effective radii interact. 
+My model will synthesize the cloud phase and effective radii sampled at the 1.6 $\mu$m band to determine how cloud phase and effective radii interact. 
 
 #### Causal Diagram
 ![A causal diagram for the interaction of cloud phase and effective radius, to the best of my knowledge.](dag.png)
@@ -34,7 +34,12 @@ From the dataset, we are given temperature, effective radius, optical thickness,
 
 #### Mathematical Description
  $$
- R_{eff} \sim \mathrm{Gamma}(\mu_i, \sigma)
+ R_{eff} \sim \mathrm{Gamma}(\alpha, \lambda)
+ $$
+ $$
+ \alpha = \frac{\mu_i^2}{\sigma^2}
+ $$$$
+ \lambda = \frac{\mu_i}{\sigma^2}
  $$
 The effective radius ($R_eff$) of droplets in clouds has been identified in the literature as one that is described by a gamma process (Hansen 1971). This likelihood distribution is used in almost all droplet size distribution models.
  
@@ -97,22 +102,20 @@ I could not track down a value for the variance of the liquid phase's effective 
 ### Prior Predictive Distribution
 Using the prior information above, I construct a prior predictive distribution for the effective radii in each population.
 
-```{r Grab Data}
+```{r Prior Pred}
+# Wrangle Data
 data <- nc_open("PACE_OCI.20250402.L3m.DAY.CLOUD.V3_0.1deg.NRT.nc")
 
-# positions
 lat <- ncvar_get(data, "lat") # columns of data matrices
 lon <- ncvar_get(data, "lon") # rows of data matrices
 lat_matrix <- matrix(lat, nrow = length(lon), ncol = length(lat), byrow = TRUE)
 lon_matrix <- matrix(lon, nrow = length(lon), ncol = length(lat), byrow = FALSE)
 
-# repeat code like this for all variables you want
 cf_ice <- ncvar_get(data, "ice_cloud_fraction")
 cot <- ncvar_get(data, "cth_cot")
 ctt <- ncvar_get(data, "ctt")
 cer_16 <- ncvar_get(data, "cer_16")
-```
-```{R Format Data}
+
 cloud_data <- data.frame(
   lat = as.vector(lat_matrix),
   lon = as.vector(lon_matrix),
@@ -126,13 +129,13 @@ cloud_data <- data.frame(
    # Select cirrus range. Rationale: https://journals.ametsoc.org/view/journals/amsm/58/1/amsmonographs-d-16-0010.1.pdf (pg 3)
    mutate( ice_idx = ifelse(cf_ice < 0.05, 0, ifelse(cf_ice < 0.95, 1, 2)) ) 
    # No ice: 0, Some ice: 1, All ice: 2
-```
-```{r Prior Predictive Sim}
+
+# Simulate Priors and Posteriors
 n_sim <- 50 # number of simulated datasets
 
 prior_pred_dist <- tibble(sim_id = c(1:n_sim)) |> 
    mutate(b0 = rnorm(n_sim, log(23), log(5)),
-          b1_0 = rstudent(n_sim, nu=2, mu=log(22/230), sigma=0.2), 
+          b1_0 = rstudent(n_sim, nu=2, mu=log(22/23), sigma=0.2), 
           # I expect the effective radius to decrease from average for 
           # (supercooled) non precipitating liquid clouds 
           b1_1 = rstudent(n_sim, nu=2, mu=log(1), sigma=0.4),
@@ -153,21 +156,21 @@ prior_pred_dist <- tibble(sim_id = c(1:n_sim)) |>
           ) |>
    unnest(cols =  c(mu, ice_idx, cf_ice)) |>
    ungroup() |>
-   mutate(alpha = mu / sigma^2,
-          lambda = mu^2 / sigma^2
+   mutate(alpha = mu^2 / sigma^2,
+          lambda = mu / sigma^2
    ) |>
    rowwise() |>
-   mutate( sim_Reff = rgamma(1, rate = alpha, shape = lambda) ) |>
+   mutate( sim_Reff = rgamma(1, shape = alpha, rate = lambda) ) |>
    ungroup()
 ```
-```{r Show r_eff by phase}
+```{r Show r_eff by phase, warning=FALSE}
 gf_dens(~sim_Reff | factor(ice_idx), group = ~sim_id, 
         data = prior_pred_dist |> filter(sim_Reff > 0.1),
          alpha = 0.6) |>
    gf_lims(x = c(0,100))
 ```
 The prior predictive distribution for each population of clouds, grouped by phase of matter. No ice is on the left, some ice is in the center, all ice is on the right. As seen from the prior predictive distribution(s), the three populations are nearly identical. Furthermore, there may be an unaccounted for effect driving many of the effective radii towards zero. I do not have the theoretical background to know what physical mechanism this might be.
-```{r Show R_eff sims}
+```{r Show R_eff sims, warning=FALSE}
 gf_dens(~sim_Reff, group = ~sim_id, 
         data = prior_pred_dist |>
            filter(sim_id <21)) |>
@@ -175,7 +178,7 @@ gf_dens(~sim_Reff, group = ~sim_id,
    gf_lims( x = c(0,1E2))
 ```
 The first 20 prior predictive distributions for effective radius. Note that the distributions not with mean ~ 0 follow the expected/observed distribution for real cirrus clouds.
-```{r}
+```{r, warning=FALSE}
 gf_boxplot(mu ~ factor(ice_idx) | sim_id,
          alpha = 0.1,
          data = prior_pred_dist |>
@@ -185,15 +188,15 @@ gf_boxplot(mu ~ factor(ice_idx) | sim_id,
 Boxplots of the first 20 simulated values of $mu$ with respect to ice content. No ice is seen on the left, some ice in the center, and all ice on the right of each pane
 
 ### Fitted Model 
-This model was fit by the MCMC package cmdstan. Four chains were computed with 2000 total iterations each using `adapt_delta = 0.8`
+This model was fit by the MCMC package cmdstan. Four chains were computed with 2000 total iterations each using `adapt_delta = 0.8`.
 
 #### Diagnostics for Fit Convergence 	
-I analyzed two fits of convergence readily available in stan: neff and Rhat. This model uses 1000 sampling iterations. The neff for the parameters associated with the categorical predictors is ~500 for all, indicating that the sampling process was mildly inefficient. Rhat for all parameters associated with the predictors was 1.00. 
+I analyzed two fits of convergence readily available in stan: neff and Rhat. This model uses 1000 sampling iterations. The neff for the parameters associated with the categorical predictors is ~500 for all, indicating that the sampling process was mildly inefficient. Rhat for all parameters associated with the predictors was larger than 1.00 which likely reflected challenges for my model to account for the large variability in cloud data. I present the results of the mostly-converged data here with the knowledge that a better model should be fit in the future.
 ```{r}
 summary(cirrus_fit_w_mixed_phase, pars = c("b0", "b1[1]", "b1[2]", "b1[3]", "sigma"))$summary
 summary(cirrus_fit_wo_mixed_phase, pars = c("b0", "b1[1]", "b1[2]", "sigma"))$summary
 ```
-Additionally, I plot the MCMC trace for all four chains to check for visual convergence.
+As seen, neff values are large enough that they should be sufficient for the model to converge, but the Rhat values near one suggest that the model is not fully converged.I plot the MCMC trace for all four chains to check for visual convergence.
 ```{r MCMC trace for model w/mixed phase}
 mcmc_trace(cirrus_fit_w_mixed_phase, pars = c("b0", "b1[1]", "b1[2]", "b1[3]", "sigma"))
 ```
@@ -201,26 +204,62 @@ The MCMC trace for the cirrus model that includes mixed phase clouds.
 ```{r MCMC trace for model w/o mixed phase}
 mcmc_trace(cirrus_fit_wo_mixed_phase, pars = c("b0", "b1[1]", "b1[2]", "sigma"))
 ```
-The chains are fairly well mixed, but not superb. Similarly, they appear to be mostly stationary. However, since the Rhat and neff values are within acceptable limits we choose to proceed.
+The chains are mixed, but not well-mixed. Similarly, they appear to be mostly stationary. Future work on this model should restrict what values the priors can take.
 
 #### Posteriors
 You may include any graphs or summary statistics of your choice that you think are useful in understanding the posterior.
 I present the posteriors for the effective radius intercept and "correction" parameters. Because of the link function, the values are the natural log of the actual effective radius. 
 
-![The effective radius intercept posterior. This should represent the global average of cirrus cloud droplet effective radius.](reff_intercept.png)
-![The effective radius "no ice" correction posterior. This should represent the global average of cirrus cloud droplet effective radius.](reff_no-ice.png)
-![The effective radius "some ice" correction posterior. This should represent the global average of cirrus cloud droplet effective radius.](reff_some-ice.png)
-![The effective radius "all ice" correction posterior. This should represent the global average of cirrus cloud droplet effective radius.](reff_all-ice.png)
+```{r Prepare Data, include = FALSE}
+cirrus_fit_df <- as.data.frame(cirrus_fit) |> rename( lnMean_Reff = b0,
+                                                                    lnNo_Ice = `b1[1]`,
+                                                                    lnSome_Ice = `b1[2]`,
+                                                                    lnAll_Ice = `b1[3]`,
+                                                                    log_lik = `lp__` )
+```
+```{r b0 posterior, warning=FALSE}
+gf_dens(~exp(lnMean_Reff), data=cirrus_fit_df, linewidth = 2, color = 'black') |>
+  gf_labs(title='R_eff for Cirrus Clouds on April 2, 2025', ylab=('Posterior Density')) |> gf_lims(x = c(0, 100))
+```
+The effective radius intercept posterior. This represents the global average of cirrus cloud droplet effective radius.
 
-There are two trends that I did not expect in these posteriors. First, I did not expect the intercept to be as small as it is. When exponentiated, the mode of this distribution comes out to ~0.045 $\mu m$ which is much smaller than what I expected and what I saw in the March 30th dataset. While this could be an error in the stan fitting code, I could not find it in the time needed for this project. The second trend is seen in the difference of the correction parameters:
+```{r b1[1] posterior, warning=FALSE}
+gf_dens(~exp(lnNo_Ice), data=cirrus_fit_df, linewidth = 2, color = 'black') |>
+  gf_labs(title='Multiplicative Correction for No-Ice Cirrus Clouds on April 2, 2025', ylab=('Posterior Density')) |> gf_lims(x=c(0,3))
+```
+The effective radius "no ice" correction posterior. This posterior suggests that the average effective radius of no-ice cirrus clouds is smaller than the global average, with most no-ice cirrus clouds having about half the global average effective radius. 
 
-![The difference between the ln(effective radii) in "some ice" and "no ice" clouds. A natural log difference of -0.35 on this scale corresponds to a difference of ~0.7 $\mu m$. The posteriors above suggest that the negative value of the difference implies that the "no ice" populations tend to have droplets with larger effective radii than cirrus clouds of mixed phase.](reff_diff_some-no.png) 
-![The difference between the ln(effective radii) in "some ice" and "no ice" clouds. A natural log difference of -0.375 on this scale corresponds to a difference of ~0.68 $\mu m$. The posteriors above suggest that the negative value of the difference implies that the "some ice" populations tend to have droplets with larger effective radii than cirrus clouds in the solid phase.](reff_diff_all-some.png) 
-![The difference between the ln(effective radii) in "all ice" and "no ice" clouds. A natural log difference of -0.725 on this scale corresponds to a difference of ~0.48 $\mu m$. The posteriors above suggest that the negative value of the difference implies that the "no ice" populations tend to have droplets with larger effective radii than cirrus clouds of solid phase.](reff_diff_all-no.png) 
-These results seem to indicate the opposite relationship between "all ice" cirrus clouds and "no ice" cirrus clouds than I expected. The droplets in "all ice" clouds are smaller on average than the droplets in "no ice" clouds. However, the ongoing issue with the value of the intercept might also be linked to the values of these corrections. If so, the corrections, like the intercept, should be viewed with great skepticism.
+```{r b1[2] posterior, warning=FALSE}
+gf_dens(~exp(lnSome_Ice), data=cirrus_fit_df, linewidth = 2, color='black') |>
+  gf_labs(title='Multiplicative Correction for Some-Ice Cirrus Clouds on April 2, 2025', ylab=('Posterior Density')) |> gf_lims(x=c(0,3))
+```
+The effective radius "some ice" correction posterior. This posterior suggests that the mean effective radius of some-ice cirrus clouds is well-represented by the global average effective radius, with most some-ice cirrus clouds having a smaller effective radius than the global average.
 
-#### Posterior Predictive Distribution for mu
-I want to make a posterior predictive distribution using the mu[i] values that were calculated in stan, but I am not sure how to do this. Any pointers would be greatly appreciated.
+```{r b1[3] posterior, warning=FALSE}
+gf_dens(~exp(lnAll_Ice), data=cirrus_fit_df, linewidth = 2, color='black') |>
+  gf_labs(title='Multiplicative Correction for All-Ice Cirrus Clouds on April 2, 2025', ylab=('Posterior Density')) |> gf_lims(x=c(0,3))
+```
+The effective radius "all ice" multiplicative correction posterior. Given the mean around 1 and a thick upper tail, this suggests that the effective radius of the all-ice cirrus clouds is larger than the global average, but with most all-ice clouds having the global average effective radius.
+
+
+```{r some - none}
+gf_dens(~(lnSome_Ice-lnNo_Ice), data=cirrus_fit_df, linewidth=2, color='blue')|> gf_labs(title="Difference in Cirrus Cloud Phase Correction Factor",
+                                                              ylab("Posterior Density"))
+```
+The difference between the natural log of the correction parameters in "some ice" and "no ice" clouds. A difference of 0.285 on this scale corresponds to a multiplicative difference of 1.33 $\mu$m. This suggests that the no_ice cloud correction is greater than the some_ice cloud correction.
+
+```{r}
+gf_dens(~(lnAll_Ice-lnSome_Ice), data=cirrus_fit_df, linewidth=2, color='royalblue')|> gf_labs(title="Difference in Cirrus Cloud Phase Correction Factor",
+                                                              ylab("Posterior Density"))
+```
+The difference between the natural log of the correction parameters in "some ice" and "no ice" clouds. A difference of 0.405 on this scale corresponds to a multiplicative difference of 1.50 $\mu$m. This suggests that the some ice cloud correction is greater than the some_ice cloud correction.
+
+```{r}
+gf_dens(~(lnAll_Ice-lnNo_Ice), data=cirrus_fit_df, linewidth=2, color='skyblue')|> gf_labs(title="Difference in Cirrus Cloud Phase Correction Factor",
+                                                              ylab("Posterior Density"))
+```
+The difference between the natural log of the correction parameters in "all ice" and "no ice" clouds. A natural log difference of 0.692 on this scale corresponds to a difference of 2.00 $\mu$m. This suggests that the no_ice correction is greater than the all ice correction.
+
 
 #### Model Comparison
 Another model was fit with where the mixed phase clouds were divided between the "no ice" and "all ice" populations. This is a test to probe whether modeling the mixed phase clouds can be done with a simpler model since the mixed phase clouds are not common. In data prep, the `cf_ice` number was divided at 0.5; all observations with `cf_ice < 0.5` went to "no ice" and the remainder went to "all ice". A modification to the stan code was made to reflect the elimination of a prior, but no other features were changed. The model was analyzed for convergence as above and was found to be convergent. I use the WAIC function from the `Rethinking` package by Richard McElreath to compare the two models. The results are shown below.
@@ -231,8 +270,9 @@ compare(cirrus_fit_w_mixed_phase, cirrus_fit_wo_mixed_phase, func=WAIC)
 
 It is clear from the WAIC scores that the cirrus model that accounts for the mixed phase is significantly better at describing the data than the model that does not account for the mixed phase.
 
+
 ### Conclusion
-According to the analysis done here, it appears that cirrus clouds made entirely of ice are composed of droplet with smaller effective radii than the global average, and cirrus clouds made entirely of water are composed of droplets with larger effective radii than the global average. This is a direct reversal of my hypothesis. However, prior knowledge of droplet size distributions for cirrus clouds suggests that the global average droplet effective radius (reported here as the $\beta_0$ parameter) is much greater than the value found in my analysis by about a factor of 1000. It is possible that there is a unit issue with effective radii being reported in mm instead of $\mu$m, and this should be looked into as the reported unit from the PACE database is "microns" (equivalently, $\mu$m).
+Based on my analysis of the PACI OCI atmospheric characteristics for April 2nd, 2025, I conclude that cirrus clouds with no ice tend to have smaller effective radii than the global average, while cirrus clouds composed entirely of ice tend to have similar or larger radii than the global average. In between, cirrus clouds with a mix of ice and water tend to have similar or smaller effective radii than the global average. Future work on this project might look at performing an analysis on the polar, mid-latitude, and tropical cirrus clouds and compare the no ice, some ice, and all ice populations between the latitudes to determine if one type of cloud is more common at one latitude than another.
 
 ### Data Availability
 All my files are available upon request through GitHub. Files can be found at https://github.com/carr-levi-a/calvinbayes25_atmsci.
