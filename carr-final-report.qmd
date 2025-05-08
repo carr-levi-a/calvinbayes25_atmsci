@@ -7,8 +7,11 @@ format: pdf
 ```{r Setup, include=FALSE}
 library(rethinking)
 library(bayesplot)
+library(ncdf4)
+library(tidyverse)
+library(ggformula)
 cirrus_fit_w_mixed_phase <- readRDS("cirrus_fit_mixed_phase.RDS")
-cirrus_fit_wo_mixed_phase <- readRDS("cirrus_fit_no_mixed_phase.RDS")
+cirrus_fit_wo_mixed_phase <- readRDS("cirrus_fit_wo_mixed_phase.RDS")
 ```
 ### Research Question
 In cirrus clouds, how does the effective radius of the droplets change with ice composition? 
@@ -103,6 +106,7 @@ I could not track down a value for the variance of the liquid phase's effective 
 Using the prior information above, I construct a prior predictive distribution for the effective radii in each population.
 
 ```{r Prior Pred}
+
 # Wrangle Data
 data <- nc_open("PACE_OCI.20250402.L3m.DAY.CLOUD.V3_0.1deg.NRT.nc")
 
@@ -178,7 +182,7 @@ gf_dens(~sim_Reff, group = ~sim_id,
    gf_lims( x = c(0,1E2))
 ```
 The first 20 prior predictive distributions for effective radius. Note that the distributions not with mean ~ 0 follow the expected/observed distribution for real cirrus clouds.
-```{r, warning=FALSE}
+```{r Show R_eff dist, warning=FALSE}
 gf_boxplot(mu ~ factor(ice_idx) | sim_id,
          alpha = 0.1,
          data = prior_pred_dist |>
@@ -192,7 +196,7 @@ This model was fit by the MCMC package cmdstan. Four chains were computed with 2
 
 #### Diagnostics for Fit Convergence 	
 I analyzed two fits of convergence readily available in stan: neff and Rhat. This model uses 1000 sampling iterations. The neff for the parameters associated with the categorical predictors is ~500 for all, indicating that the sampling process was mildly inefficient. Rhat for all parameters associated with the predictors was larger than 1.00 which likely reflected challenges for my model to account for the large variability in cloud data. I present the results of the mostly-converged data here with the knowledge that a better model should be fit in the future.
-```{r}
+```{r Summarize models}
 summary(cirrus_fit_w_mixed_phase, pars = c("b0", "b1[1]", "b1[2]", "b1[3]", "sigma"))$summary
 summary(cirrus_fit_wo_mixed_phase, pars = c("b0", "b1[1]", "b1[2]", "sigma"))$summary
 ```
@@ -211,7 +215,7 @@ You may include any graphs or summary statistics of your choice that you think a
 I present the posteriors for the effective radius intercept and "correction" parameters. Because of the link function, the values are the natural log of the actual effective radius. 
 
 ```{r Prepare Data, include = FALSE}
-cirrus_fit_df <- as.data.frame(cirrus_fit) |> rename( lnMean_Reff = b0,
+cirrus_fit_df <- as.data.frame(cirrus_fit_w_mixed_phase) |> rename( lnMean_Reff = b0,
                                                                     lnNo_Ice = `b1[1]`,
                                                                     lnSome_Ice = `b1[2]`,
                                                                     lnAll_Ice = `b1[3]`,
@@ -223,19 +227,19 @@ gf_dens(~exp(lnMean_Reff), data=cirrus_fit_df, linewidth = 2, color = 'black') |
 ```
 The effective radius intercept posterior. This represents the global average of cirrus cloud droplet effective radius.
 
-```{r b1[1] posterior, warning=FALSE}
+```{r b11 posterior, warning=FALSE}
 gf_dens(~exp(lnNo_Ice), data=cirrus_fit_df, linewidth = 2, color = 'black') |>
   gf_labs(title='Multiplicative Correction for No-Ice Cirrus Clouds on April 2, 2025', ylab=('Posterior Density')) |> gf_lims(x=c(0,3))
 ```
 The effective radius "no ice" correction posterior. This posterior suggests that the average effective radius of no-ice cirrus clouds is smaller than the global average, with most no-ice cirrus clouds having about half the global average effective radius. 
 
-```{r b1[2] posterior, warning=FALSE}
+```{r b12 posterior, warning=FALSE}
 gf_dens(~exp(lnSome_Ice), data=cirrus_fit_df, linewidth = 2, color='black') |>
   gf_labs(title='Multiplicative Correction for Some-Ice Cirrus Clouds on April 2, 2025', ylab=('Posterior Density')) |> gf_lims(x=c(0,3))
 ```
 The effective radius "some ice" correction posterior. This posterior suggests that the mean effective radius of some-ice cirrus clouds is well-represented by the global average effective radius, with most some-ice cirrus clouds having a smaller effective radius than the global average.
 
-```{r b1[3] posterior, warning=FALSE}
+```{r b13 posterior, warning=FALSE}
 gf_dens(~exp(lnAll_Ice), data=cirrus_fit_df, linewidth = 2, color='black') |>
   gf_labs(title='Multiplicative Correction for All-Ice Cirrus Clouds on April 2, 2025', ylab=('Posterior Density')) |> gf_lims(x=c(0,3))
 ```
